@@ -26,11 +26,6 @@ namespace System.Text.RegularExpressions
     /// </summary>
     public class Regex : ISerializable
     {
-        protected internal string pattern;                   // The string pattern provided
-        protected internal RegexOptions roptions;            // the top-level options from the options string
-
-        // *********** Match timeout fields { ***********
-
         // We need this because time is queried using Environment.TickCount for performance reasons
         // (Environment.TickCount returns milliseconds as an int and cycles):
         private static readonly TimeSpan MaximumMatchTimeout = TimeSpan.FromMilliseconds(int.MaxValue - 1);
@@ -45,24 +40,34 @@ namespace System.Text.RegularExpressions
         // value as Timeout.InfiniteTimeSpan creating an implementation detail dependency only.
         public static readonly TimeSpan InfiniteMatchTimeout = Timeout.InfiniteTimeSpan;
 
-        protected internal TimeSpan internalMatchTimeout;   // timeout for the execution of this regex
+        // timeout for the execution of this regex
+        protected internal TimeSpan internalMatchTimeout;
 
         // During static initialisation of Regex we check
         private const string DefaultMatchTimeout_ConfigKeyName = "REGEX_DEFAULT_MATCH_TIMEOUT";
 
         // DefaultMatchTimeout specifies the match timeout to use if no other timeout was specified
         // by one means or another. Typically, it is set to InfiniteMatchTimeout.
-        internal static readonly TimeSpan DefaultMatchTimeout = InitDefaultMatchTimeout();
+        internal static readonly TimeSpan s_defaultMatchTimeout = InitDefaultMatchTimeout();
 
-        // *********** } match timeout fields ***********
+        // the cache of regex objects that are currently loaded
+        internal static LinkedList<Regex> s_livecode = new LinkedList<Regex>();
 
+        internal static int s_cacheSize = 15;
+        internal const int MaxOptionShift = 10;
+
+        protected internal string pattern;                   // The string pattern provided
+        protected internal RegexOptions roptions;            // the top-level options from the options string
         protected internal RegexRunnerFactory factory;
-
-        protected internal Hashtable caps;          // if captures are sparse, this is the hashtable capnum->index
-        protected internal Hashtable capnames;      // if named captures are used, this maps names->index
-
-        protected internal string[] capslist;              // if captures are sparse or named captures are used, this is the sorted list of names
-        protected internal int capsize;                    // the size of the capture array
+        protected internal Hashtable caps;                  // if captures are sparse, this is the hashtable capnum->index
+        protected internal Hashtable capnames;              // if named captures are used, this maps names->index
+        protected internal string[] capslist;               // if captures are sparse or named captures are used, this is the sorted list of names
+        protected internal int capsize;                     // the size of the capture array
+        internal ExclusiveReference _runnerref;             // cached runner
+        internal SharedReference _replref;                  // cached parsed replacement pattern
+        internal RegexCode _code;                           // if interpreted, this is the code for RegexInterpreter
+        internal bool _refsInitialized = false;
+        private string _cultureKey;
 
         [CLSCompliant(false)]
         protected IDictionary Caps
@@ -104,20 +109,9 @@ namespace System.Text.RegularExpressions
             }
         }
 
-
-        internal ExclusiveReference _runnerref;             // cached runner
-        internal SharedReference _replref;                  // cached parsed replacement pattern
-        internal RegexCode _code;                           // if interpreted, this is the code for RegexInterpreter
-        internal bool _refsInitialized = false;
-
-        internal static LinkedList<CachedCodeEntry> s_livecode = new LinkedList<CachedCodeEntry>();// the cache of code and factories that are currently loaded
-        internal static int s_cacheSize = 15;
-
-        internal const int MaxOptionShift = 10;
-
         protected Regex()
         {
-            internalMatchTimeout = DefaultMatchTimeout;
+            internalMatchTimeout = s_defaultMatchTimeout;
         }
 
         /// <summary>
@@ -125,7 +119,7 @@ namespace System.Text.RegularExpressions
         /// expression.
         /// </summary>
         public Regex(string pattern)
-            : this(pattern, RegexOptions.None, DefaultMatchTimeout, false)
+            : this(pattern, RegexOptions.None, s_defaultMatchTimeout)
         {
         }
 
@@ -134,12 +128,12 @@ namespace System.Text.RegularExpressions
         /// specified regular expression with options that modify the pattern.
         /// </summary>
         public Regex(string pattern, RegexOptions options)
-            : this(pattern, options, DefaultMatchTimeout, false)
+            : this(pattern, options, s_defaultMatchTimeout)
         {
         }
 
         public Regex(string pattern, RegexOptions options, TimeSpan matchTimeout)
-            : this(pattern, options, matchTimeout, false)
+            : this(pattern, options, matchTimeout, null, true)
         {
         }
 
@@ -154,7 +148,7 @@ namespace System.Text.RegularExpressions
             throw new PlatformNotSupportedException();
         }
 
-        private Regex(string pattern, RegexOptions options, TimeSpan matchTimeout, bool addToCache)
+        private Regex(string pattern, RegexOptions options, TimeSpan matchTimeout, string cultureKey, bool lookupCache)
         {
             if (pattern == null)
             {
@@ -180,23 +174,36 @@ namespace System.Text.RegularExpressions
                 throw new ArgumentOutOfRangeException(nameof(options));
             }
 
+            // Set parameters
             ValidateMatchTimeout(matchTimeout);
-
-            string cultureKey;
-            if ((options & RegexOptions.CultureInvariant) != 0)
-                cultureKey = CultureInfo.InvariantCulture.ToString();
-            else
-                cultureKey = CultureInfo.CurrentCulture.ToString();
-
-            // Try to look up this regex in the cache.
-            var key = new CachedCodeEntryKey(options, cultureKey, pattern);
-            CachedCodeEntry cached = LookupCachedAndUpdate(key);
-
+            _cultureKey = cultureKey ?? GetCultureKey(options);
             this.pattern = pattern;
             roptions = options;
             internalMatchTimeout = matchTimeout;
 
-            if (cached == null)
+            // Look into the cache
+            bool copiedFromCache = false;
+            if (lookupCache)
+            {
+                Regex cached = FindOrAddCache(pattern, options, matchTimeout, _cultureKey, false);
+                if (cached != null)
+                {
+                    copiedFromCache = true;
+                    caps = cached.caps;
+                    capnames = cached.capnames;
+                    capslist = cached.capslist;
+                    capsize = cached.capsize;
+                    _code = cached._code;
+#if FEATURE_COMPILED
+                    factory = cached.factory;
+#endif
+                    _runnerref = cached._runnerref;
+                    _replref = cached._replref;
+                    _refsInitialized = true;
+                }
+            }
+
+            if (!copiedFromCache)
             {
                 // Parse the input
                 RegexTree tree = RegexParser.Parse(pattern, roptions);
@@ -211,22 +218,6 @@ namespace System.Text.RegularExpressions
                 InitializeReferences();
 
                 tree = null;
-                if (addToCache)
-                    cached = CacheCode(key);
-            }
-            else
-            {
-                caps = cached._caps;
-                capnames = cached._capnames;
-                capslist = cached._capslist;
-                capsize = cached._capsize;
-                _code = cached._code;
-#if FEATURE_COMPILED
-                factory = cached._factory;
-#endif
-                _runnerref = cached._runnerref;
-                _replref = cached._replref;
-                _refsInitialized = true;
             }
 
 #if FEATURE_COMPILED
@@ -234,12 +225,6 @@ namespace System.Text.RegularExpressions
             if (UseOptionC() && factory == null)
             {
                 factory = Compile(_code, roptions);
-
-                if (addToCache && cached != null)
-                {
-                    cached.AddCompiled(factory);
-                }
-
                 _code = null;
             }
 #endif
@@ -566,7 +551,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static bool IsMatch(string input, string pattern)
         {
-            return IsMatch(input, pattern, RegexOptions.None, DefaultMatchTimeout);
+            return IsMatch(input, pattern, RegexOptions.None, s_defaultMatchTimeout);
         }
 
         /*
@@ -579,12 +564,12 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static bool IsMatch(string input, string pattern, RegexOptions options)
         {
-            return IsMatch(input, pattern, options, DefaultMatchTimeout);
+            return IsMatch(input, pattern, options, s_defaultMatchTimeout);
         }
 
         public static bool IsMatch(string input, string pattern, RegexOptions options, TimeSpan matchTimeout)
         {
-            return new Regex(pattern, options, matchTimeout, true).IsMatch(input);
+            return FindOrAddCache(pattern, options, matchTimeout).IsMatch(input);
         }
 
         /*
@@ -615,7 +600,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return (null == Run(true, -1, input, 0, input.Length, startat));
+            return Run(true, -1, input, 0, input.Length, startat) == null;
         }
 
         /*
@@ -627,7 +612,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static Match Match(string input, string pattern)
         {
-            return Match(input, pattern, RegexOptions.None, DefaultMatchTimeout);
+            return Match(input, pattern, RegexOptions.None, s_defaultMatchTimeout);
         }
 
         /*
@@ -640,13 +625,13 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static Match Match(string input, string pattern, RegexOptions options)
         {
-            return Match(input, pattern, options, DefaultMatchTimeout);
+            return Match(input, pattern, options, s_defaultMatchTimeout);
         }
 
 
         public static Match Match(string input, string pattern, RegexOptions options, TimeSpan matchTimeout)
         {
-            return new Regex(pattern, options, matchTimeout, true).Match(input);
+            return FindOrAddCache(pattern, options, matchTimeout).Match(input);
         }
 
         /*
@@ -704,7 +689,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static MatchCollection Matches(string input, string pattern)
         {
-            return Matches(input, pattern, RegexOptions.None, DefaultMatchTimeout);
+            return Matches(input, pattern, RegexOptions.None, s_defaultMatchTimeout);
         }
 
         /*
@@ -715,12 +700,12 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static MatchCollection Matches(string input, string pattern, RegexOptions options)
         {
-            return Matches(input, pattern, options, DefaultMatchTimeout);
+            return Matches(input, pattern, options, s_defaultMatchTimeout);
         }
 
         public static MatchCollection Matches(string input, string pattern, RegexOptions options, TimeSpan matchTimeout)
         {
-            return new Regex(pattern, options, matchTimeout, true).Matches(input);
+            return FindOrAddCache(pattern, options, matchTimeout).Matches(input);
         }
 
         /*
@@ -758,7 +743,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static string Replace(string input, string pattern, string replacement)
         {
-            return Replace(input, pattern, replacement, RegexOptions.None, DefaultMatchTimeout);
+            return Replace(input, pattern, replacement, RegexOptions.None, s_defaultMatchTimeout);
         }
 
         /// <summary>
@@ -768,12 +753,12 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static string Replace(string input, string pattern, string replacement, RegexOptions options)
         {
-            return Replace(input, pattern, replacement, options, DefaultMatchTimeout);
+            return Replace(input, pattern, replacement, options, s_defaultMatchTimeout);
         }
 
         public static string Replace(string input, string pattern, string replacement, RegexOptions options, TimeSpan matchTimeout)
         {
-            return new Regex(pattern, options, matchTimeout, true).Replace(input, replacement);
+            return FindOrAddCache(pattern, options, matchTimeout).Replace(input, replacement);
         }
 
         /// <summary>
@@ -833,7 +818,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static string Replace(string input, string pattern, MatchEvaluator evaluator)
         {
-            return Replace(input, pattern, evaluator, RegexOptions.None, DefaultMatchTimeout);
+            return Replace(input, pattern, evaluator, RegexOptions.None, s_defaultMatchTimeout);
         }
 
         /// <summary>
@@ -842,12 +827,12 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static string Replace(string input, string pattern, MatchEvaluator evaluator, RegexOptions options)
         {
-            return Replace(input, pattern, evaluator, options, DefaultMatchTimeout);
+            return Replace(input, pattern, evaluator, options, s_defaultMatchTimeout);
         }
 
         public static string Replace(string input, string pattern, MatchEvaluator evaluator, RegexOptions options, TimeSpan matchTimeout)
         {
-            return new Regex(pattern, options, matchTimeout, true).Replace(input, evaluator);
+            return FindOrAddCache(pattern, options, matchTimeout).Replace(input, evaluator);
         }
 
         /// <summary>
@@ -893,7 +878,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static string[] Split(string input, string pattern)
         {
-            return Split(input, pattern, RegexOptions.None, DefaultMatchTimeout);
+            return Split(input, pattern, RegexOptions.None, s_defaultMatchTimeout);
         }
 
         /// <summary>
@@ -901,12 +886,12 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public static string[] Split(string input, string pattern, RegexOptions options)
         {
-            return Split(input, pattern, options, DefaultMatchTimeout);
+            return Split(input, pattern, options, s_defaultMatchTimeout);
         }
 
         public static string[] Split(string input, string pattern, RegexOptions options, TimeSpan matchTimeout)
         {
-            return new Regex(pattern, options, matchTimeout, true).Split(input);
+            return FindOrAddCache(pattern, options, matchTimeout).Split(input);
         }
 
         /// <summary>
@@ -1023,59 +1008,48 @@ namespace System.Text.RegularExpressions
             return match;
         }
 
-        /*
-         * Find code cache based on options+pattern
-         */
-        private static CachedCodeEntry LookupCachedAndUpdate(CachedCodeEntryKey key)
+        
+        private static string GetCultureKey(RegexOptions options)
         {
-            lock (s_livecode)
-            {
-                for (LinkedListNode<CachedCodeEntry> current = s_livecode.First; current != null; current = current.Next)
-                {
-                    if (current.Value._key == key)
-                    {
-                        // If we find an entry in the cache, move it to the head at the same time.
-                        s_livecode.Remove(current);
-                        s_livecode.AddFirst(current);
-                        return current.Value;
-                    }
-                }
-            }
-
-            return null;
+            if ((options & RegexOptions.CultureInvariant) != 0)
+                return CultureInfo.InvariantCulture.ToString();
+            else
+                return CultureInfo.CurrentCulture.ToString();
         }
 
-        /*
-         * Add current code to the cache
-         */
-        private CachedCodeEntry CacheCode(CachedCodeEntryKey key)
+        private static Regex FindOrAddCache(string pattern, RegexOptions options, TimeSpan matchTimeout, string cultureKey = null, bool createNewInstance = true)
         {
-            CachedCodeEntry newcached = null;
+            cultureKey = cultureKey ?? GetCultureKey(options);            
 
             lock (s_livecode)
             {
-                // first look for it in the cache and move it to the head
-                for (LinkedListNode<CachedCodeEntry> current = s_livecode.First; current != null; current = current.Next)
+                // If we find an entry in the cache, move it to the head at the same time.
+                for (LinkedListNode<Regex> current = s_livecode.First; current != null; current = current.Next)
                 {
-                    if (current.Value._key == key)
-                    {
+                    if (current.Value.pattern == pattern && current.Value.roptions == options && current.Value._cultureKey == cultureKey)
+                    {                        
                         s_livecode.Remove(current);
                         s_livecode.AddFirst(current);
+
                         return current.Value;
                     }
                 }
 
-                // it wasn't in the cache, so we'll add a new one.  Shortcut out for the case where cacheSize is zero.
-                if (s_cacheSize != 0)
+                if (!createNewInstance)
                 {
-                    newcached = new CachedCodeEntry(key, capnames, capslist, _code, caps, capsize, _runnerref, _replref);
-                    s_livecode.AddFirst(newcached);
+                    return null;
+                }
+
+                var regex = new Regex(pattern, options, matchTimeout, cultureKey, false);
+                if (s_cacheSize > 0)
+                {                    
+                    s_livecode.AddFirst(regex);
                     if (s_livecode.Count > s_cacheSize)
                         s_livecode.RemoveLast();
                 }
-            }
 
-            return newcached;
+                return regex;
+            }
         }
 
         protected bool UseOptionC()
@@ -1115,89 +1089,7 @@ namespace System.Text.RegularExpressions
      * Callback class
      */
     public delegate string MatchEvaluator(Match match);
-
-    /*
-     * Used as a key for CacheCodeEntry
-     */
-    internal struct CachedCodeEntryKey : IEquatable<CachedCodeEntryKey>
-    {
-        private readonly RegexOptions _options;
-        private readonly string _cultureKey;
-        private readonly string _pattern;
-
-        internal CachedCodeEntryKey(RegexOptions options, string cultureKey, string pattern)
-        {
-            _options = options;
-            _cultureKey = cultureKey;
-            _pattern = pattern;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is CachedCodeEntryKey && Equals((CachedCodeEntryKey)obj);
-        }
-
-        public bool Equals(CachedCodeEntryKey other)
-        {
-            return this == other;
-        }
-
-        public static bool operator ==(CachedCodeEntryKey left, CachedCodeEntryKey right)
-        {
-            return left._options == right._options && left._cultureKey == right._cultureKey && left._pattern == right._pattern;
-        }
-
-        public static bool operator !=(CachedCodeEntryKey left, CachedCodeEntryKey right)
-        {
-            return !(left == right);
-        }
-
-        public override int GetHashCode()
-        {
-            return ((int)_options) ^ _cultureKey.GetHashCode() ^ _pattern.GetHashCode();
-        }
-    }
-
-    /*
-     * Used to cache byte codes
-     */
-    internal sealed class CachedCodeEntry
-    {
-        internal CachedCodeEntryKey _key;
-        internal RegexCode _code;
-        internal Hashtable _caps;
-        internal Hashtable _capnames;
-        internal string[] _capslist;
-#if FEATURE_COMPILED
-        internal RegexRunnerFactory _factory;
-#endif
-        internal int _capsize;
-        internal ExclusiveReference _runnerref;
-        internal SharedReference _replref;
-
-        internal CachedCodeEntry(CachedCodeEntryKey key, Hashtable capnames, string[] capslist, RegexCode code, Hashtable caps, int capsize, ExclusiveReference runner, SharedReference repl)
-        {
-            _key = key;
-            _capnames = capnames;
-            _capslist = capslist;
-
-            _code = code;
-            _caps = caps;
-            _capsize = capsize;
-
-            _runnerref = runner;
-            _replref = repl;
-        }
-
-#if FEATURE_COMPILED
-        internal void AddCompiled(RegexRunnerFactory factory)
-        {
-            _factory = factory;
-            _code = null;
-        }
-#endif
-    }
-
+    
     /*
      * Used to cache one exclusive runner reference
      */
