@@ -2,7 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-// The CaptureCollection lists the captured Capture numbers
+// The GroupCollection lists the captured Capture numbers
 // contained in a compiled Regex.
 
 using System.Collections;
@@ -11,75 +11,90 @@ using System.Diagnostics;
 
 namespace System.Text.RegularExpressions
 {
-    /*
-     * This collection returns the Captures for a group
-     * in the order in which they were matched (left to right
-     * or right to left). It is created by Group.Captures
-     */
     /// <summary>
     /// Represents a sequence of capture substrings. The object is used
     /// to return the set of captures done by a single capturing group.
     /// </summary>
     [DebuggerDisplay("Count = {Count}")]
-    [DebuggerTypeProxy(typeof(RegexCollectionDebuggerProxy<Capture>))]
-    public class CaptureCollection : IList<Capture>, IReadOnlyList<Capture>, IList
+    [DebuggerTypeProxy(typeof(CollectionDebuggerProxy<Group>))]
+    public class GroupCollection : IList<Group>, IReadOnlyList<Group>, IList
     {
-        private readonly Group _group;
-        private readonly int _capcount;
-        private Capture[] _captures;
+        private readonly Match _match;
+        private readonly Hashtable _captureMap;
 
-        internal CaptureCollection(Group group)
+        // cache of Group objects fed to the user
+        private Group[] _groups;
+
+        internal GroupCollection(Match match, Hashtable caps)
         {
-            _group = group;
-            _capcount = _group._capcount;
+            _match = match;
+            _captureMap = caps;
         }
 
         public bool IsReadOnly => true;
 
         /// <summary>
-        /// Returns the number of captures.
+        /// Returns the number of groups.
         /// </summary>
-        public int Count => _capcount;
+        public int Count => _match._matchcount.Length;
 
-        /// <summary>
-        /// Returns a specific capture, by index, in this collection.
-        /// </summary>
-        public Capture this[int i] => GetCapture(i);
+        public Group this[int groupnum] => GetGroup(groupnum);
+
+        public Group this[string groupname] => _match._regex == null ?
+            Group.s_emptyGroup :
+            GetGroup(_match._regex.GroupNumberFromName(groupname));
 
         /// <summary>
         /// Provides an enumerator in the same order as Item[].
         /// </summary>
         public IEnumerator GetEnumerator() => new Enumerator(this);
 
-        IEnumerator<Capture> IEnumerable<Capture>.GetEnumerator() => new Enumerator(this);
+        IEnumerator<Group> IEnumerable<Group>.GetEnumerator() => new Enumerator(this);
+
+        private Group GetGroup(int groupnum)
+        {
+            if (_captureMap != null)
+            {
+                int groupNumImpl;
+                if (_captureMap.TryGetValue(groupnum, out groupNumImpl))
+                {
+                    return GetGroupImpl(groupNumImpl);
+                }
+            }
+            else if (groupnum < _match._matchcount.Length && groupnum >= 0)
+            {
+                return GetGroupImpl(groupnum);
+            }
+
+            return Group.s_emptyGroup;
+        }
 
         /// <summary>
-        /// Returns the set of captures for the group
+        /// Caches the group objects
         /// </summary>
-        private Capture GetCapture(int i)
+        private Group GetGroupImpl(int groupnum)
         {
-            if (i == _capcount - 1 && i >= 0)
-                return _group;
+            if (groupnum == 0)
+                return _match;
 
-            if (i >= _capcount || i < 0)
-                throw new ArgumentOutOfRangeException(nameof(i));
+            // Construct all the Group objects the first time GetGroup is called
 
-            // first time a capture is accessed, compute them all
-            if (_captures == null)
+            if (_groups == null)
             {
-                _captures = new Capture[_capcount];
-                for (int j = 0; j < _capcount - 1; j++)
+                _groups = new Group[_match._matchcount.Length - 1];
+                for (int i = 0; i < _groups.Length; i++)
                 {
-                    _captures[j] = new Capture(_group._text, _group._caps[j * 2], _group._caps[j * 2 + 1]);
+                    string groupname = _match._regex.GroupNameFromNumber(i + 1);
+                    _groups[i] = new Group(_match.Text, _match._matches[i + 1], _match._matchcount[i + 1], groupname);
                 }
             }
 
-            return _captures[i];
+            return _groups[groupnum - 1];
         }
 
         public bool IsSynchronized => false;
 
-        public object SyncRoot => _group;
+        public object SyncRoot => _match;
 
         public void CopyTo(Array array, int arrayIndex)
         {
@@ -92,7 +107,7 @@ namespace System.Text.RegularExpressions
             }
         }
 
-        public void CopyTo(Capture[] array, int arrayIndex)
+        public void CopyTo(Group[] array, int arrayIndex)
         {
             if (array == null)
                 throw new ArgumentNullException(nameof(array));
@@ -107,9 +122,9 @@ namespace System.Text.RegularExpressions
             }
         }
 
-        int IList<Capture>.IndexOf(Capture item)
+        int IList<Group>.IndexOf(Group item)
         {
-            var comparer = EqualityComparer<Capture>.Default;
+            var comparer = EqualityComparer<Group>.Default;
             for (int i = 0; i < Count; i++)
             {
                 if (comparer.Equals(this[i], item))
@@ -118,36 +133,36 @@ namespace System.Text.RegularExpressions
             return -1;
         }
 
-        void IList<Capture>.Insert(int index, Capture item)
+        void IList<Group>.Insert(int index, Group item)
         {
             throw new NotSupportedException(SR.NotSupported_ReadOnlyCollection);
         }
 
-        void IList<Capture>.RemoveAt(int index)
+        void IList<Group>.RemoveAt(int index)
         {
             throw new NotSupportedException(SR.NotSupported_ReadOnlyCollection);
         }
 
-        Capture IList<Capture>.this[int index]
+        Group IList<Group>.this[int index]
         {
             get { return this[index]; }
             set { throw new NotSupportedException(SR.NotSupported_ReadOnlyCollection); }
         }
 
-        void ICollection<Capture>.Add(Capture item)
+        void ICollection<Group>.Add(Group item)
         {
             throw new NotSupportedException(SR.NotSupported_ReadOnlyCollection);
         }
 
-        void ICollection<Capture>.Clear()
+        void ICollection<Group>.Clear()
         {
             throw new NotSupportedException(SR.NotSupported_ReadOnlyCollection);
         }
 
-        bool ICollection<Capture>.Contains(Capture item) =>
-            ((IList<Capture>)this).IndexOf(item) >= 0;
+        bool ICollection<Group>.Contains(Group item) =>
+            ((IList<Group>)this).IndexOf(item) >= 0;
 
-        bool ICollection<Capture>.Remove(Capture item)
+        bool ICollection<Group>.Remove(Group item)
         {
             throw new NotSupportedException(SR.NotSupported_ReadOnlyCollection);
         }
@@ -163,10 +178,10 @@ namespace System.Text.RegularExpressions
         }
 
         bool IList.Contains(object value) =>
-            value is Capture && ((ICollection<Capture>)this).Contains((Capture)value);
+            value is Group && ((ICollection<Group>)this).Contains((Group)value);
 
         int IList.IndexOf(object value) =>
-            value is Capture ? ((IList<Capture>)this).IndexOf((Capture)value) : -1;
+            value is Group ? ((IList<Group>)this).IndexOf((Group)value) : -1;
 
         void IList.Insert(int index, object value)
         {
@@ -191,12 +206,12 @@ namespace System.Text.RegularExpressions
             set { throw new NotSupportedException(SR.NotSupported_ReadOnlyCollection); }
         }
 
-        private sealed class Enumerator : IEnumerator<Capture>
+        private sealed class Enumerator : IEnumerator<Group>
         {
-            private readonly CaptureCollection _collection;
+            private readonly GroupCollection _collection;
             private int _index;
 
-            internal Enumerator(CaptureCollection collection)
+            internal Enumerator(GroupCollection collection)
             {
                 Debug.Assert(collection != null, "collection cannot be null.");
 
@@ -216,7 +231,7 @@ namespace System.Text.RegularExpressions
                 return _index < size;
             }
 
-            public Capture Current
+            public Group Current
             {
                 get
                 {

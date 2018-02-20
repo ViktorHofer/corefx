@@ -21,7 +21,7 @@ namespace System.Text.RegularExpressions
     /// names in a regular expression.
     /// </summary>
     [DebuggerDisplay("Count = {Count}")]
-    [DebuggerTypeProxy(typeof(RegexCollectionDebuggerProxy<Match>))]
+    [DebuggerTypeProxy(typeof(CollectionDebuggerProxy<Match>))]
     public class MatchCollection : IList<Match>, IReadOnlyList<Match>, IList
     {
         private readonly Regex _regex;
@@ -112,7 +112,7 @@ namespace System.Text.RegularExpressions
 
                 _matches.Add(match);
 
-                _prevlen = match._length;
+                _prevlen = match.Length;
                 _startat = match._textpos;
             } while (_matches.Count <= i);
 
