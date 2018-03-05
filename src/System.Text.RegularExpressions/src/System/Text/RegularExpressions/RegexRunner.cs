@@ -275,13 +275,13 @@ namespace System.Text.RegularExpressions
             if (runmatch == null)
             {
                 if (runregex.caps != null)
-                    runmatch = new MatchSparse(runregex, runregex.caps, runregex.capsize, runtext, runtextbeg, runtextend - runtextbeg, runtextstart);
+                    runmatch = new MatchSparse(runregex, runregex.caps, runregex.capsize, runtext.AsMemory(), runtextbeg, runtextend - runtextbeg, runtextstart);
                 else
-                    runmatch = new Match(runregex, runregex.capsize, runtext, runtextbeg, runtextend - runtextbeg, runtextstart);
+                    runmatch = new Match(runregex, runregex.capsize, runtext.AsMemory(), runtextbeg, runtextend - runtextbeg, runtextstart);
             }
             else
             {
-                runmatch.Reset(runregex, runtext, runtextbeg, runtextend, runtextstart);
+                runmatch.Reset(runregex, runtext.AsMemory(), runtextbeg, runtextend, runtextstart);
             }
 
             // note we test runcrawl, because it is the last one to be allocated

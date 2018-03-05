@@ -213,6 +213,25 @@ namespace System.Text
             _pos += value.Length;
         }
 
+        public unsafe void AppendReversed(ReadOnlySpan<char> value)
+        {
+            int pos = _pos;
+            if (pos > _chars.Length - value.Length)
+            {
+                Grow(value.Length);
+            }
+
+            Span<char> slice = _chars.Slice(_pos, value.Length);
+            value.CopyTo(slice);
+            slice.Reverse();
+            _pos += value.Length;
+        }
+
+        public void Reverse(int start = 0, int length = 0)
+        {
+            _chars.Slice(start, length > 0 ? length : _pos).Reverse();
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Span<char> AppendSpan(int length)
         {

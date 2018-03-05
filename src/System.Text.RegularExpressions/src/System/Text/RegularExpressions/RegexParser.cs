@@ -10,6 +10,7 @@
 // It would be nice to get rid of the comment modes, since the
 // ScanBlank() calls are just kind of duct-taped in.
 
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -101,20 +102,22 @@ namespace System.Text.RegularExpressions
         /*
          * Escapes all metacharacters (including |,(,),[,{,|,^,$,*,+,?,\, spaces and #)
          */
-        public static string Escape(string input)
+        public static string Escape(ReadOnlySpan<char> input, Span<char> output, bool targetSpan, out int charsWritten)
         {
             for (int i = 0; i < input.Length; i++)
             {
                 if (IsMetachar(input[i]))
                 {
-                    StringBuilder sb = StringBuilderCache.Acquire();
+                    Span<char> charInitSpan = stackalloc char[256];
+                    var vsb = new ValueStringBuilder(charInitSpan);
+                    
                     char ch = input[i];
                     int lastpos;
 
-                    sb.Append(input, 0, i);
+                    vsb.Append(input.Slice(0, i));
                     do
                     {
-                        sb.Append('\\');
+                        vsb.Append('\\');
                         switch (ch)
                         {
                             case '\n':
@@ -130,7 +133,7 @@ namespace System.Text.RegularExpressions
                                 ch = 'f';
                                 break;
                         }
-                        sb.Append(ch);
+                        vsb.Append(ch);
                         i++;
                         lastpos = i;
 
@@ -143,14 +146,15 @@ namespace System.Text.RegularExpressions
                             i++;
                         }
 
-                        sb.Append(input, lastpos, i - lastpos);
+                        vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return StringBuilderCache.GetStringAndRelease(sb);
+                    return SpanHelpers.CopyOutput(vsb, output, false, targetSpan, out charsWritten);
                 }
             }
 
-            return input;
+            // If nothing to escape, return the input.
+            return SpanHelpers.CopyInput(input, output, targetSpan, out charsWritten);
         }
 
         /*

@@ -39,7 +39,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Split(input, 0, UseOptionR() ? input.Length : 0);
+            return SplitImpl(input, 0, UseOptionR() ? input.Length : 0);
         }
 
         /// <summary>
@@ -51,7 +51,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Split(this, input, count, UseOptionR() ? input.Length : 0);
+            return SplitImpl(input, count, UseOptionR() ? input.Length : 0);
         }
 
         /// <summary>
@@ -62,44 +62,37 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Split(this, input, count, startat);
+            return SplitImpl(input, count, startat);
         }
 
         /// <summary>
         /// Does a split. In the right-to-left case we reorder the
         /// array to be forwards.
         /// </summary>
-        private static string[] Split(Regex regex, string input, int count, int startat)
+        private string[] SplitImpl(string input, int count, int startat)
         {
             if (count < 0)
                 throw new ArgumentOutOfRangeException(nameof(count), SR.CountTooSmall);
             if (startat < 0 || startat > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);
 
-            string[] result;
-
             if (count == 1)
             {
-                result = new string[1];
-                result[0] = input;
-                return result;
+                return new string[1] { input };
             }
 
             count -= 1;
-
-            Match match = regex.Match(input, startat);
+            Match match = Match(input, startat);
 
             if (!match.Success)
             {
-                result = new string[1];
-                result[0] = input;
-                return result;
+                return new string[1] { input };
             }
             else
             {
-                List<string> al = new List<string>();
+                var al = new List<string>();
 
-                if (!regex.RightToLeft)
+                if (!RightToLeft)
                 {
                     int prevat = 0;
 
@@ -154,8 +147,7 @@ namespace System.Text.RegularExpressions
                     }
 
                     al.Add(input.Substring(0, prevat));
-
-                    al.Reverse(0, al.Count);
+                    al.Reverse();
                 }
 
                 return al.ToArray();

@@ -27,13 +27,13 @@ namespace System.Text.RegularExpressions
         private readonly Regex _regex;
         private readonly List<Match> _matches;
         private bool _done;
-        private readonly string _input;
+        private readonly ReadOnlyMemory<char> _input;
         private readonly int _beginning;
         private readonly int _length;
         private int _startat;
         private int _prevlen;
 
-        internal MatchCollection(Regex regex, string input, int beginning, int length, int startat)
+        internal MatchCollection(Regex regex, ReadOnlyMemory<char> input, int beginning, int length, int startat)
         {
             if (startat < 0 || startat > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);
@@ -102,7 +102,7 @@ namespace System.Text.RegularExpressions
 
             do
             {
-                match = _regex.Run(false, _prevlen, _input, _beginning, _length, _startat);
+                match = _regex.Run(false, _prevlen, _input, ReadOnlySpan<char>.Empty, _beginning, _length, _startat);
 
                 if (!match.Success)
                 {
@@ -113,7 +113,7 @@ namespace System.Text.RegularExpressions
                 _matches.Add(match);
 
                 _prevlen = match.Length;
-                _startat = match._textpos;
+                _startat = match.TextPos;
             } while (_matches.Count <= i);
 
             return match;

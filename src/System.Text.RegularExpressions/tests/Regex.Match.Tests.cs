@@ -783,11 +783,11 @@ namespace System.Text.RegularExpressions.Tests
             // Input is null
             AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match(null, "pattern"));
             AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match(null, "pattern", RegexOptions.None));
-            AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match(null, "pattern", RegexOptions.None, TimeSpan.FromSeconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match((string)null, "pattern", RegexOptions.None, TimeSpan.FromSeconds(1)));
 
-            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match(null));
-            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match(null, 0));
-            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match(null, 0, 0));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match((string)null));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match((string)null, 0));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match((string)null, 0, 0));
 
             // Pattern is null
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Match("input", null));
