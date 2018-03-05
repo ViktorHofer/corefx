@@ -9,6 +9,8 @@
     <Configurations>netcoreapp-Debug;netcoreapp-Release;netcoreappaot-Debug;netcoreappaot-Release;uap-Windows_NT-Debug;uap-Windows_NT-Release</Configurations>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="System\Buffers\MemoryOrPinnedSpan.cs" />
+    <Compile Include="System\Buffers\SpanHelper.cs" />
     <Compile Include="System\Collections\Generic\ValueListBuilder.Pop.cs" />
     <Compile Include="System\Collections\HashtableExtensions.cs" />
     <Compile Include="System\Text\RegularExpressions\Capture.cs" />
@@ -43,6 +45,7 @@
     <Compile Include="System\Text\RegularExpressions\RegexRunnerFactory.cs" />
     <Compile Include="System\Text\RegularExpressions\RegexTree.cs" />
     <Compile Include="System\Text\RegularExpressions\RegexWriter.cs" />
+    <Compile Include="System\Text\ValueStringBuilder.Reverse.cs" />
     <!-- Common or Common-branched source files -->
     <Compile Include="$(CommonPath)\System\NotImplemented.cs">
       <Link>Common\System\NotImplemented.cs</Link>
@@ -53,7 +56,6 @@
     <Compile Include="$(CommonPath)\CoreLib\System\Text\ValueStringBuilder.cs">
       <Link>Common\System\Text\ValueStringBuilder.cs</Link>
     </Compile>
-    <Compile Include="System\Text\ValueStringBuilder.Reverse.cs" />
   </ItemGroup>
   <!-- Files that enable compiled feature -->
   <ItemGroup Condition="'$(TargetGroup)' == 'netcoreapp'">

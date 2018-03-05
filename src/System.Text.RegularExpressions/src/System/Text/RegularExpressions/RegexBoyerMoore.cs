@@ -205,7 +205,7 @@ namespace System.Text.RegularExpressions
             }
         }
 
-        private bool MatchPattern(string text, int index)
+        private bool MatchPattern(ReadOnlySpan<char> text, int index)
         {
             if (CaseInsensitive)
             {
@@ -214,18 +214,29 @@ namespace System.Text.RegularExpressions
                     return false;
                 }
 
-                return (0 == string.Compare(Pattern, 0, text, index, Pattern.Length, CaseInsensitive, _culture));
+                // TODO: replace with to be added culture CompareInfo APIs
+                TextInfo textinfo = _culture.TextInfo;
+                for (int i = 0; i < Pattern.Length; i++)
+                {
+                    Debug.Assert(textinfo.ToLower(Pattern[i]) == Pattern[i], "pattern should be converted to lower case in constructor!");
+                    if (textinfo.ToLower(text[index + i]) != Pattern[i])
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
             }
             else
             {
-                return (0 == string.CompareOrdinal(Pattern, 0, text, index, Pattern.Length));
+                return (0 == text.Slice(index, Pattern.Length).CompareTo(Pattern, StringComparison.Ordinal));
             }
         }
 
         /// <summary>
         /// When a regex is anchored, we can do a quick IsMatch test instead of a Scan
         /// </summary>
-        public bool IsMatch(string text, int index, int beglimit, int endlimit)
+        public bool IsMatch(ReadOnlySpan<char> text, int index, int beglimit, int endlimit)
         {
             if (!RightToLeft)
             {
@@ -251,7 +262,7 @@ namespace System.Text.RegularExpressions
         /// The direction and case-sensitivity of the match is determined
         /// by the arguments to the RegexBoyerMoore constructor.
         /// </summary>
-        public int Scan(string text, int index, int beglimit, int endlimit)
+        public int Scan(ReadOnlySpan<char> text, int index, int beglimit, int endlimit)
         {
             int defadv;
             int test;

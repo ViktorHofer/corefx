@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Buffers;
+
 namespace System.Text.RegularExpressions
 {
     public partial class Regex
@@ -24,9 +26,24 @@ namespace System.Text.RegularExpressions
             return IsMatch(input, pattern, options, s_defaultMatchTimeout);
         }
 
+        /// <summary>
+        /// Searches the input string for one or more occurrences of the text
+        /// supplied in the pattern parameter with matching options supplied in the options
+        /// parameter, bounded by the specified matchTimeout.
+        /// </summary>
         public static bool IsMatch(string input, string pattern, RegexOptions options, TimeSpan matchTimeout)
         {
             return new Regex(pattern, options, matchTimeout, true).IsMatch(input);
+        }
+
+        /// <summary>
+        /// Searches the input text for one or more occurrences of the text
+        /// supplied in the pattern parameter with optional matching options supplied in the options
+        /// parameter, optionally bounded by the specified matchTimeout.
+        /// </summary>
+        public static bool IsMatch(ReadOnlySpan<char> input, string pattern, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
+        {
+            return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).IsMatch(input);
         }
 
         /*
@@ -41,6 +58,15 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
+            return IsMatch(input.AsSpan());
+        }
+
+        /// <summary>
+        /// Searches the input Span for one or more matches using the previous pattern,
+        /// options, and starting position.
+        /// </summary>
+        public bool IsMatch(ReadOnlySpan<char> input)
+        {
             return IsMatch(input, UseOptionR() ? input.Length : 0);
         }
 
@@ -57,7 +83,12 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return (null == Run(true, -1, input, 0, input.Length, startat));
+            return IsMatch(input.AsSpan(), startat);
+        }
+
+        private bool IsMatch(ReadOnlySpan<char> input, int startat)
+        {
+            return (Run(true, -1, default, input, 0, input.Length, startat) == null);
         }
 
         /// <summary>
@@ -71,17 +102,34 @@ namespace System.Text.RegularExpressions
 
         /// <summary>
         /// Searches the input string for one or more occurrences of the text
-        /// supplied in the pattern parameter. Matching is modified with an option
-        /// string.
+        /// supplied in the pattern parameter. Matching is modified with matching 
+        /// options supplied in the options parameter.
         /// </summary>
         public static Match Match(string input, string pattern, RegexOptions options)
         {
             return Match(input, pattern, options, s_defaultMatchTimeout);
         }
 
+        /// <summary>
+        /// Searches the input string for one or more occurrences of the text
+        /// supplied in the pattern parameter. Matching is modified with matching 
+        /// options supplied in the options parameter. Bounded by a timeout supplied
+        /// in the matchTimeout parameter.
+        /// </summary>
         public static Match Match(string input, string pattern, RegexOptions options, TimeSpan matchTimeout)
         {
             return new Regex(pattern, options, matchTimeout, true).Match(input);
+        }
+
+        /// <summary>
+        /// Searches the input text for one or more occurrences of the text
+        /// supplied in the pattern parameter. Optionally, matching is modified with matching 
+        /// options supplied in the options parameter. Optionally bounded by a timeout supplied
+        /// in the matchTimeout parameter.
+        /// </summary>
+        public static Match Match(ReadOnlyMemory<char> input, string pattern, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
+        {
+            return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).Match(input);
         }
 
         /*
@@ -97,7 +145,12 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Match(input, UseOptionR() ? input.Length : 0);
+            return Match(input.AsMemory());
+        }
+
+        public Match Match(ReadOnlyMemory<char> input)
+        {
+            return Match(input, 0, input.Length, UseOptionR() ? input.Length : 0);
         }
 
         /*
@@ -112,7 +165,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Run(false, -1, input, 0, input.Length, startat);
+            return Match(input.AsMemory(), 0, input.Length, startat);
         }
 
         /*
@@ -128,7 +181,12 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Run(false, -1, input, beginning, length, UseOptionR() ? beginning + length : beginning);
+            return Match(input.AsMemory(), beginning, length, UseOptionR() ? beginning + length : beginning);
+        }
+
+        private Match Match(ReadOnlyMemory<char> input, int beginning, int length, int startat)
+        {
+            return Run(false, -1, new MemoryOrPinnedSpan<char>(input), ReadOnlySpan<char>.Empty, beginning, length, startat);
         }
 
         /// <summary>
@@ -152,6 +210,11 @@ namespace System.Text.RegularExpressions
             return new Regex(pattern, options, matchTimeout, true).Matches(input);
         }
 
+        public static MatchCollection Matches(ReadOnlyMemory<char> input, string pattern, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
+        {
+            return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).Matches(input);
+        }
+
         /*
          * Finds the first match for the regular expression starting at the beginning
          * of the string Enumerator(or at the end of the string if the regex is leftward)
@@ -164,6 +227,11 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
+            return Matches(input.AsMemory());
+        }
+
+        public MatchCollection Matches(ReadOnlyMemory<char> input)
+        {
             return Matches(input, UseOptionR() ? input.Length : 0);
         }
 
@@ -178,7 +246,12 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return new MatchCollection(this, input, 0, input.Length, startat);
+            return Matches(input.AsMemory(), startat);
+        }
+
+        private MatchCollection Matches(ReadOnlyMemory<char> input, int startat)
+        {
+            return new MatchCollection(this, new MemoryOrPinnedSpan<char>(input), 0, input.Length, startat);
         }
     }
 }

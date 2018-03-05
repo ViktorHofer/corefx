@@ -7,12 +7,13 @@ using System.Threading;
 namespace System.Text.RegularExpressions
 {
     /// <summary>
-    /// Used to cache one exclusive runner reference
+    /// Used to cache one exclusive runner reference.
+    /// Guarantees threat safety of the Regex type by locking the cached runner (interpreter/compiled).
     /// </summary>
     internal sealed class ExclusiveReference
     {
-        private RegexRunner _ref;
-        private RegexRunner _obj;
+        private object _ref;
+        private object _obj;
         private volatile int _locked;
 
         /// <summary>
@@ -21,21 +22,21 @@ namespace System.Text.RegularExpressions
         /// If the exclusive lock can't be obtained, null is returned;
         /// if the object can't be returned, the lock is released.
         /// </summary>
-        public RegexRunner Get()
+        public object Get()
         {
             // try to obtain the lock
 
             if (0 == Interlocked.Exchange(ref _locked, 1))
             {
                 // grab reference
-                RegexRunner obj = _ref;
+                object obj = _ref;
 
                 // release the lock and return null if no reference
                 if (obj == null)
                 {
                     _locked = 0;
 
-                    return null;
+                    return default;
                 }
 
                 // remember the reference and keep the lock
@@ -44,7 +45,7 @@ namespace System.Text.RegularExpressions
                 return obj;
             }
 
-            return null;
+            return default;
         }
 
         /// <summary>
@@ -53,15 +54,15 @@ namespace System.Text.RegularExpressions
         /// If the object is the one that's under lock, the lock is released.
         /// If there is no cached object, then the lock is obtained and the object is placed in the cache.
         /// </summary>
-        public void Release(RegexRunner obj)
+        public void Release(object obj)
         {
             if (obj == null)
                 throw new ArgumentNullException(nameof(obj));
 
             // if this reference owns the lock, release it
-            if (_obj == obj)
+            if (Equals(_obj, obj))
             {
-                _obj = null;
+                _obj = default;
                 _locked = 0;
 
                 return;
@@ -74,7 +75,7 @@ namespace System.Text.RegularExpressions
                 if (0 == Interlocked.Exchange(ref _locked, 1))
                 {
                     // if there's really no reference, cache this reference
-                    if (_ref == null)
+                    if (Equals(_ref, default))
                         _ref = obj;
 
                     // release the lock

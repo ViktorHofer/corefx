@@ -5,13 +5,61 @@
 // The RegexInterpreter executes a block of regular expression codes
 // while consuming input.
 
+using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 
 namespace System.Text.RegularExpressions
 {
-    internal sealed class RegexInterpreter : RegexRunner
+    internal sealed class RegexInterpreter
     {
+        private int _runtextbeg;                // beginning of text to search
+        private int _runtextend;                // end of text to search
+        private int _runtextstart;              // starting point for search
+                                                
+        private int _runtextpos;                // current position in text
+
+        private int[] _runtrack;                // The backtracking stack.  Opcodes use this to store data regarding
+        private int _runtrackpos;               // what they have matched and where to backtrack to.  Each "frame" on
+                                                // the stack takes the form of [CodePosition Data1 Data2...], where
+                                                // CodePosition is the position of the current opcode and
+                                                // the data values are all optional.  The CodePosition can be negative, and
+                                                // these values (also called "back2") are used by the BranchMark family of opcodes
+                                                // to indicate whether they are backtracking after a successful or failed
+                                                // match.
+                                                // When we backtrack, we pop the CodePosition off the stack, set the current
+                                                // instruction pointer to that code position, and mark the opcode
+                                                // with a backtracking flag ("Back").  Each opcode then knows how to
+                                                // handle its own data.
+
+        private int[] _runstack;                // This stack is used to track text positions across different opcodes.
+        private int _runstackpos;               // For example, in /(a*b)+/, the parentheses result in a SetMark/CaptureMark
+                                                // pair. SetMark records the text position before we match a*b.  Then
+                                                // CaptureMark uses that position to figure out where the capture starts.
+                                                // Opcodes which push onto this stack are always paired with other opcodes
+                                                // which will pop the value from it later.  A successful match should mean
+                                                // that this stack is empty.
+
+        private int[] _runcrawl;                // The crawl stack is used to keep track of captures.  Every time a group
+        private int _runcrawlpos;               // has a capture, we push its group number onto the runcrawl stack.  In
+                                                // the case of a balanced match, we push BOTH groups onto the stack.
+
+        private int _runtrackcount;             // count of states that may do backtracking
+
+        private Match _runmatch;                // result object
+        private Regex _runregex;                // regex object
+
+        private int _timeout;                   // timeout in milliseconds (needed for actual)
+        private bool _ignoreTimeout;
+        private int _timeoutOccursAt;
+
+        // We have determined this value in a series of experiments where x86 retail
+        // builds (ono-lab-optimized) were run on different pattern/input pairs. Larger values
+        // of TimeoutCheckFrequency did not tend to increase performance; smaller values
+        // of TimeoutCheckFrequency tended to slow down the execution.
+        private const int TimeoutCheckFrequency = 1000;
+        private int _timeoutChecksToSkip;
+
         private readonly RegexCode _code;
         private readonly CultureInfo _culture;
         private int _operator;
@@ -28,9 +76,454 @@ namespace System.Text.RegularExpressions
             _culture = culture;
         }
 
-        protected override void InitTrackCount()
+        /// <summary>
+        /// Scans the string to find the first match. Uses the Match object
+        /// both to feed text in and as a place to store matches that come out.
+        ///
+        /// All the action is in the abstract Go() method defined by subclasses. Our
+        /// responsibility is to load up the class members (as done here) before
+        /// calling Go.
+        ///
+        /// The optimizer can compute a set of candidate starting characters,
+        /// and we could use a separate method Skip() that will quickly scan past
+        /// any characters that we know can't match.
+        /// </summary>
+        public Match Scan(Regex regex, in MemoryOrPinnedSpan<char> mem, ReadOnlySpan<char> input, int textbeg, int textend, int textstart, int prevlen, bool quick, TimeSpan timeout)
         {
-            runtrackcount = _code.TrackCount;
+            _ignoreTimeout = (Regex.InfiniteMatchTimeout == timeout);
+            _timeout = _ignoreTimeout
+                                    ? (int)Regex.InfiniteMatchTimeout.TotalMilliseconds
+                                    : (int)(timeout.TotalMilliseconds + 0.5); // Round
+            _runregex = regex;
+            _runtextbeg = textbeg;
+            _runtextend = textend;
+            _runtextstart = textstart;
+
+            int bump = _runregex.RightToLeft ? -1 : 1;
+            int stoppos = _runregex.RightToLeft ? _runtextbeg : _runtextend;
+
+            _runtextpos = textstart;
+
+            // If previous match was empty or failed, advance by one before matching
+            if (prevlen == 0)
+            {
+                if (_runtextpos == stoppos)
+                    return Match.Empty;
+
+                _runtextpos += bump;
+            }
+
+            StartTimeoutWatch();
+            bool initted = false;
+
+            for (; ; )
+            {
+#if DEBUG
+                if (_runregex.Debug)
+                {
+                    Debug.WriteLine("");
+                    Debug.WriteLine("Search range: from " + _runtextbeg.ToString(CultureInfo.InvariantCulture) + " to " + _runtextend.ToString(CultureInfo.InvariantCulture));
+                    Debug.WriteLine("Firstchar search starting at " + _runtextpos.ToString(CultureInfo.InvariantCulture) + " stopping at " + stoppos.ToString(CultureInfo.InvariantCulture));
+                }
+#endif
+                if (FindFirstChar(input))
+                {
+                    CheckTimeout(input);
+
+                    if (!initted)
+                    {
+                        InitMatch(mem);
+                        initted = true;
+                    }
+#if DEBUG
+                    if (_runregex.Debug)
+                    {
+                        Debug.WriteLine("Executing engine starting at " + _runtextpos.ToString(CultureInfo.InvariantCulture));
+                        Debug.WriteLine("");
+                    }
+#endif
+                    Go(input);
+
+                    if (_runmatch._matchcount[0] > 0)
+                    {
+                        // in quick mode, a successful match returns null, and
+                        // the allocated match object is left in the cache
+                        if (quick)
+                            return null;
+
+                        // We'll return a match even if it touches a previous empty match
+                        return TidyMatch();
+                    }
+
+                    // reset state for another go
+                    _runtrackpos = _runtrack.Length;
+                    _runstackpos = _runstack.Length;
+                    _runcrawlpos = _runcrawl.Length;
+                }
+
+                // failure!
+
+                if (_runtextpos == stoppos)
+                {
+                    return Match.Empty;
+                }
+
+                // Recognize leading []* and various anchors, and bump on failure accordingly
+
+                // Bump by one and start again
+
+                _runtextpos += bump;
+            }
+            // We never get here
+        }
+
+        private void StartTimeoutWatch()
+        {
+            if (_ignoreTimeout)
+                return;
+
+            _timeoutChecksToSkip = TimeoutCheckFrequency;
+
+            // We are using Environment.TickCount and not Timewatch for performance reasons.
+            // Environment.TickCount is an int that cycles. We intentionally let timeoutOccursAt
+            // overflow it will still stay ahead of Environment.TickCount for comparisons made
+            // in DoCheckTimeout():
+            unchecked
+            {
+                _timeoutOccursAt = Environment.TickCount + _timeout;
+            }
+        }
+
+        private void CheckTimeout(ReadOnlySpan<char> input)
+        {
+            if (_ignoreTimeout)
+                return;
+
+            DoCheckTimeout(input);
+        }
+
+        private void DoCheckTimeout(ReadOnlySpan<char> input)
+        {
+            if (--_timeoutChecksToSkip != 0)
+                return;
+
+            _timeoutChecksToSkip = TimeoutCheckFrequency;
+
+            // Note that both, Environment.TickCount and timeoutOccursAt are ints and can overflow and become negative.
+            // See the comment in StartTimeoutWatch().
+
+            int currentMillis = Environment.TickCount;
+
+            if (currentMillis < _timeoutOccursAt)
+                return;
+
+            if (0 > _timeoutOccursAt && 0 < currentMillis)
+                return;
+
+#if DEBUG
+            if (_runregex.Debug)
+            {
+                Debug.WriteLine("");
+                Debug.WriteLine("RegEx match timeout occurred!");
+                Debug.WriteLine("Specified timeout:       " + TimeSpan.FromMilliseconds(_timeout).ToString());
+                Debug.WriteLine("Timeout check frequency: " + TimeoutCheckFrequency);
+                Debug.WriteLine("Search pattern:          " + _runregex.pattern);
+                Debug.WriteLine("Input:                   " + input.ToString());
+                Debug.WriteLine("About to throw RegexMatchTimeoutException.");
+            }
+#endif
+
+            throw new RegexMatchTimeoutException(input.ToString(), _runregex.pattern, TimeSpan.FromMilliseconds(_timeout));
+        }
+
+        /// <summary>
+        /// Initializes all the data members that are used by Go()
+        /// </summary>
+        private void InitMatch(MemoryOrPinnedSpan<char> input)
+        {
+            // Use a hashtabled Match object if the capture numbers are sparse
+
+            if (_runmatch == null)
+            {
+                if (_runregex.caps != null)
+                    _runmatch = new MatchSparse(_runregex, _runregex.caps, _runregex.capsize, input, _runtextbeg, _runtextend - _runtextbeg, _runtextstart);
+                else
+                    _runmatch = new Match(_runregex, _runregex.capsize, input, _runtextbeg, _runtextend - _runtextbeg, _runtextstart);
+            }
+            else
+            {
+                _runmatch.Reset(_runregex, input, _runtextbeg, _runtextend, _runtextstart);
+            }
+
+            // note we test runcrawl, because it is the last one to be allocated
+            // If there is an alloc failure in the middle of the three allocations,
+            // we may still return to reuse this instance, and we want to behave
+            // as if the allocations didn't occur. (we used to test _trackcount != 0)
+
+            if (_runcrawl != null)
+            {
+                _runtrackpos = _runtrack.Length;
+                _runstackpos = _runstack.Length;
+                _runcrawlpos = _runcrawl.Length;
+                return;
+            }
+
+            InitTrackCount();
+
+            int tracksize = _runtrackcount * 8;
+            int stacksize = _runtrackcount * 8;
+
+            if (tracksize < 32)
+                tracksize = 32;
+            if (stacksize < 16)
+                stacksize = 16;
+
+            _runtrack = new int[tracksize];
+            _runtrackpos = tracksize;
+
+            _runstack = new int[stacksize];
+            _runstackpos = stacksize;
+
+            _runcrawl = new int[32];
+            _runcrawlpos = 32;
+        }
+
+        /// <summary>
+        /// Put match in its canonical form before returning it.
+        /// </summary>
+        private Match TidyMatch()
+        {
+            Match match = _runmatch;
+            _runmatch = null;
+            match.Tidy(_runtextpos);
+
+            return match;
+        }
+
+        /// <summary>
+        /// Called by the implementation of Go() to increase the size of storage
+        /// </summary>
+        private void EnsureStorage()
+        {
+            if (_runstackpos < _runtrackcount * 4)
+                DoubleStack();
+            if (_runtrackpos < _runtrackcount * 4)
+                DoubleTrack();
+        }
+
+        /// <summary>
+        /// Called by the implementation of Go() to decide whether the pos
+        /// at the specified index is a boundary or not. It's just not worth
+        /// emitting inline code for this logic.
+        /// </summary>
+        private bool IsBoundary(ReadOnlySpan<char> text, int index, int startpos, int endpos)
+        {
+            return (index > startpos && RegexCharClass.IsWordChar(text[index - 1])) !=
+                   (index < endpos && RegexCharClass.IsWordChar(text[index]));
+        }
+
+        private bool IsECMABoundary(ReadOnlySpan<char> text, int index, int startpos, int endpos)
+        {
+            return (index > startpos && RegexCharClass.IsECMAWordChar(text[index - 1])) !=
+                   (index < endpos && RegexCharClass.IsECMAWordChar(text[index]));
+        }
+
+        private static bool CharInSet(char ch, string set, string category)
+        {
+            string charClass = RegexCharClass.ConvertOldStringsToClass(set, category);
+            return RegexCharClass.CharInClass(ch, charClass);
+        }
+
+        private static bool CharInClass(char ch, string charClass)
+        {
+            return RegexCharClass.CharInClass(ch, charClass);
+        }
+
+        /// <summary>
+        /// Called by the implementation of Go() to increase the size of the
+        /// backtracking stack.
+        /// </summary>
+        private void DoubleTrack()
+        {
+            int[] newtrack;
+
+            newtrack = new int[_runtrack.Length * 2];
+
+            Array.Copy(_runtrack, 0, newtrack, _runtrack.Length, _runtrack.Length);
+            _runtrackpos += _runtrack.Length;
+            _runtrack = newtrack;
+        }
+
+        /// <summary>
+        /// Called by the implementation of Go() to increase the size of the
+        /// grouping stack.
+        /// </summary>
+        private void DoubleStack()
+        {
+            int[] newstack;
+
+            newstack = new int[_runstack.Length * 2];
+
+            Array.Copy(_runstack, 0, newstack, _runstack.Length, _runstack.Length);
+            _runstackpos += _runstack.Length;
+            _runstack = newstack;
+        }
+
+        /// <summary>
+        /// Increases the size of the longjump unrolling stack.
+        /// </summary>
+        private void DoubleCrawl()
+        {
+            int[] newcrawl;
+
+            newcrawl = new int[_runcrawl.Length * 2];
+
+            Array.Copy(_runcrawl, 0, newcrawl, _runcrawl.Length, _runcrawl.Length);
+            _runcrawlpos += _runcrawl.Length;
+            _runcrawl = newcrawl;
+        }
+
+        /// <summary>
+        /// Save a number on the longjump unrolling stack
+        /// </summary>
+        private void Crawl(int i)
+        {
+            if (_runcrawlpos == 0)
+                DoubleCrawl();
+
+            _runcrawl[--_runcrawlpos] = i;
+        }
+
+        /// <summary>
+        /// Remove a number from the longjump unrolling stack
+        /// </summary>
+        private int Popcrawl()
+        {
+            return _runcrawl[_runcrawlpos++];
+        }
+
+        /// <summary>
+        /// Get the height of the stack
+        /// </summary>
+        private int Crawlpos()
+        {
+            return _runcrawl.Length - _runcrawlpos;
+        }
+
+        /// <summary>
+        /// Called by Go() to capture a subexpression. Note that the
+        /// capnum used here has already been mapped to a non-sparse
+        /// index (by the code generator RegexWriter).
+        /// </summary>
+        private void Capture(int capnum, int start, int end)
+        {
+            if (end < start)
+            {
+                int T;
+
+                T = end;
+                end = start;
+                start = T;
+            }
+
+            Crawl(capnum);
+            _runmatch.AddMatch(capnum, start, end - start);
+        }
+
+        /// <summary>
+        /// Called by Go() to capture a subexpression. Note that the
+        /// capnum used here has already been mapped to a non-sparse
+        /// index (by the code generator RegexWriter).
+        /// </summary>
+        private void TransferCapture(int capnum, int uncapnum, int start, int end)
+        {
+            int start2;
+            int end2;
+
+            // these are the two intervals that are cancelling each other
+
+            if (end < start)
+            {
+                int T;
+
+                T = end;
+                end = start;
+                start = T;
+            }
+
+            start2 = MatchIndex(uncapnum);
+            end2 = start2 + MatchLength(uncapnum);
+
+            // The new capture gets the innermost defined interval
+
+            if (start >= end2)
+            {
+                end = start;
+                start = end2;
+            }
+            else if (end <= start2)
+            {
+                start = start2;
+            }
+            else
+            {
+                if (end > end2)
+                    end = end2;
+                if (start2 > start)
+                    start = start2;
+            }
+
+            Crawl(uncapnum);
+            _runmatch.BalanceMatch(uncapnum);
+
+            if (capnum != -1)
+            {
+                Crawl(capnum);
+                _runmatch.AddMatch(capnum, start, end - start);
+            }
+        }
+
+        /*
+         * Called by Go() to revert the last capture
+         */
+        private void Uncapture()
+        {
+            int capnum = Popcrawl();
+            _runmatch.RemoveMatch(capnum);
+        }
+
+        /// <summary>
+        /// Call out to runmatch to get around visibility issues
+        /// </summary>
+        private bool IsMatched(int cap)
+        {
+            return _runmatch.IsMatched(cap);
+        }
+
+        /// <summary>
+        /// Call out to runmatch to get around visibility issues
+        /// </summary>
+        private int MatchIndex(int cap)
+        {
+            return _runmatch.MatchIndex(cap);
+        }
+
+        /// <summary>
+        /// Call out to runmatch to get around visibility issues
+        /// </summary>
+        private int MatchLength(int cap)
+        {
+            return _runmatch.MatchLength(cap);
+        }
+
+        /// <summary>
+        /// InitTrackCount must initialize the runtrackcount field; this is
+        /// used to know how large the initial runtrack and runstack arrays
+        /// must be.
+        /// </summary>
+        private void InitTrackCount()
+        {
+            _runtrackcount = _code.TrackCount;
         }
 
         private void Advance(int i)
@@ -51,74 +544,74 @@ namespace System.Text.RegularExpressions
 
         private void Textto(int newpos)
         {
-            runtextpos = newpos;
+            _runtextpos = newpos;
         }
 
         private void Trackto(int newpos)
         {
-            runtrackpos = runtrack.Length - newpos;
+            _runtrackpos = _runtrack.Length - newpos;
         }
 
         private int Textstart()
         {
-            return runtextstart;
+            return _runtextstart;
         }
 
         private int Textpos()
         {
-            return runtextpos;
+            return _runtextpos;
         }
 
         // push onto the backtracking stack
         private int Trackpos()
         {
-            return runtrack.Length - runtrackpos;
+            return _runtrack.Length - _runtrackpos;
         }
 
         private void TrackPush()
         {
-            runtrack[--runtrackpos] = _codepos;
+            _runtrack[--_runtrackpos] = _codepos;
         }
 
         private void TrackPush(int I1)
         {
-            runtrack[--runtrackpos] = I1;
-            runtrack[--runtrackpos] = _codepos;
+            _runtrack[--_runtrackpos] = I1;
+            _runtrack[--_runtrackpos] = _codepos;
         }
 
         private void TrackPush(int I1, int I2)
         {
-            runtrack[--runtrackpos] = I1;
-            runtrack[--runtrackpos] = I2;
-            runtrack[--runtrackpos] = _codepos;
+            _runtrack[--_runtrackpos] = I1;
+            _runtrack[--_runtrackpos] = I2;
+            _runtrack[--_runtrackpos] = _codepos;
         }
 
         private void TrackPush(int I1, int I2, int I3)
         {
-            runtrack[--runtrackpos] = I1;
-            runtrack[--runtrackpos] = I2;
-            runtrack[--runtrackpos] = I3;
-            runtrack[--runtrackpos] = _codepos;
+            _runtrack[--_runtrackpos] = I1;
+            _runtrack[--_runtrackpos] = I2;
+            _runtrack[--_runtrackpos] = I3;
+            _runtrack[--_runtrackpos] = _codepos;
         }
 
         private void TrackPush2(int I1)
         {
-            runtrack[--runtrackpos] = I1;
-            runtrack[--runtrackpos] = -_codepos;
+            _runtrack[--_runtrackpos] = I1;
+            _runtrack[--_runtrackpos] = -_codepos;
         }
 
         private void TrackPush2(int I1, int I2)
         {
-            runtrack[--runtrackpos] = I1;
-            runtrack[--runtrackpos] = I2;
-            runtrack[--runtrackpos] = -_codepos;
+            _runtrack[--_runtrackpos] = I1;
+            _runtrack[--_runtrackpos] = I2;
+            _runtrack[--_runtrackpos] = -_codepos;
         }
 
         private void Backtrack()
         {
-            int newpos = runtrack[runtrackpos++];
+            int newpos = _runtrack[_runtrackpos++];
 #if DEBUG
-            if (runmatch.Debug)
+            if (_runmatch.Debug)
             {
                 if (newpos < 0)
                     Debug.WriteLine("       Backtracking (back2) to code position " + (-newpos));
@@ -153,13 +646,13 @@ namespace System.Text.RegularExpressions
 
         private void TrackPop()
         {
-            runtrackpos++;
+            _runtrackpos++;
         }
 
         // pop framesize items from the backtracking stack
         private void TrackPop(int framesize)
         {
-            runtrackpos += framesize;
+            _runtrackpos += framesize;
         }
 
         // Technically we are actually peeking at items already popped.  So if you want to
@@ -168,36 +661,36 @@ namespace System.Text.RegularExpressions
         // TrackPeek();
         private int TrackPeek()
         {
-            return runtrack[runtrackpos - 1];
+            return _runtrack[_runtrackpos - 1];
         }
 
         // get the ith element down on the backtracking stack
         private int TrackPeek(int i)
         {
-            return runtrack[runtrackpos - i - 1];
+            return _runtrack[_runtrackpos - i - 1];
         }
 
         // Push onto the grouping stack
         private void StackPush(int I1)
         {
-            runstack[--runstackpos] = I1;
+            _runstack[--_runstackpos] = I1;
         }
 
         private void StackPush(int I1, int I2)
         {
-            runstack[--runstackpos] = I1;
-            runstack[--runstackpos] = I2;
+            _runstack[--_runstackpos] = I1;
+            _runstack[--_runstackpos] = I2;
         }
 
         private void StackPop()
         {
-            runstackpos++;
+            _runstackpos++;
         }
 
         // pop framesize items from the grouping stack
         private void StackPop(int framesize)
         {
-            runstackpos += framesize;
+            _runstackpos += framesize;
         }
 
         // Technically we are actually peeking at items already popped.  So if you want to
@@ -206,13 +699,13 @@ namespace System.Text.RegularExpressions
         // StackPeek();
         private int StackPeek()
         {
-            return runstack[runstackpos - 1];
+            return _runstack[_runstackpos - 1];
         }
 
         // get the ith element down on the grouping stack
         private int StackPeek(int i)
         {
-            return runstack[runstackpos - i - 1];
+            return _runstack[_runstackpos - i - 1];
         }
 
         private int Operator()
@@ -227,12 +720,12 @@ namespace System.Text.RegularExpressions
 
         private int Leftchars()
         {
-            return runtextpos - runtextbeg;
+            return _runtextpos - _runtextbeg;
         }
 
         private int Rightchars()
         {
-            return runtextend - runtextpos;
+            return _runtextend - _runtextpos;
         }
 
         private int Bump()
@@ -242,46 +735,46 @@ namespace System.Text.RegularExpressions
 
         private int Forwardchars()
         {
-            return _rightToLeft ? runtextpos - runtextbeg : runtextend - runtextpos;
+            return _rightToLeft ? _runtextpos - _runtextbeg : _runtextend - _runtextpos;
         }
 
-        private char Forwardcharnext()
+        private char Forwardcharnext(ReadOnlySpan<char> input)
         {
-            char ch = (_rightToLeft ? runtext[--runtextpos] : runtext[runtextpos++]);
+            char ch = (_rightToLeft ? input[--_runtextpos] : input[_runtextpos++]);
 
             return (_caseInsensitive ? _culture.TextInfo.ToLower(ch) : ch);
         }
 
-        private bool Stringmatch(string str)
+        private bool Stringmatch(ReadOnlySpan<char> input, string str)
         {
             int c;
             int pos;
 
             if (!_rightToLeft)
             {
-                if (runtextend - runtextpos < (c = str.Length))
+                if (_runtextend - _runtextpos < (c = str.Length))
                     return false;
 
-                pos = runtextpos + c;
+                pos = _runtextpos + c;
             }
             else
             {
-                if (runtextpos - runtextbeg < (c = str.Length))
+                if (_runtextpos - _runtextbeg < (c = str.Length))
                     return false;
 
-                pos = runtextpos;
+                pos = _runtextpos;
             }
 
             if (!_caseInsensitive)
             {
                 while (c != 0)
-                    if (str[--c] != runtext[--pos])
+                    if (str[--c] != input[--pos])
                         return false;
             }
             else
             {
                 while (c != 0)
-                    if (str[--c] != _culture.TextInfo.ToLower(runtext[--pos]))
+                    if (str[--c] != _culture.TextInfo.ToLower(input[--pos]))
                         return false;
             }
 
@@ -290,12 +783,12 @@ namespace System.Text.RegularExpressions
                 pos += str.Length;
             }
 
-            runtextpos = pos;
+            _runtextpos = pos;
 
             return true;
         }
 
-        private bool Refmatch(int index, int len)
+        private bool Refmatch(ReadOnlySpan<char> input, int index, int len)
         {
             int c;
             int pos;
@@ -303,17 +796,17 @@ namespace System.Text.RegularExpressions
 
             if (!_rightToLeft)
             {
-                if (runtextend - runtextpos < len)
+                if (_runtextend - _runtextpos < len)
                     return false;
 
-                pos = runtextpos + len;
+                pos = _runtextpos + len;
             }
             else
             {
-                if (runtextpos - runtextbeg < len)
+                if (_runtextpos - _runtextbeg < len)
                     return false;
 
-                pos = runtextpos;
+                pos = _runtextpos;
             }
             cmpos = index + len;
 
@@ -322,13 +815,13 @@ namespace System.Text.RegularExpressions
             if (!_caseInsensitive)
             {
                 while (c-- != 0)
-                    if (runtext[--cmpos] != runtext[--pos])
+                    if (input[--cmpos] != input[--pos])
                         return false;
             }
             else
             {
                 while (c-- != 0)
-                    if (_culture.TextInfo.ToLower(runtext[--cmpos]) != _culture.TextInfo.ToLower(runtext[--pos]))
+                    if (_culture.TextInfo.ToLower(input[--cmpos]) != _culture.TextInfo.ToLower(input[--pos]))
                         return false;
             }
 
@@ -337,72 +830,77 @@ namespace System.Text.RegularExpressions
                 pos += len;
             }
 
-            runtextpos = pos;
+            _runtextpos = pos;
 
             return true;
         }
 
         private void Backwardnext()
         {
-            runtextpos += _rightToLeft ? 1 : -1;
+            _runtextpos += _rightToLeft ? 1 : -1;
         }
 
-        private char CharAt(int j)
+        private char CharAt(ReadOnlySpan<char> input, int j)
         {
-            return runtext[j];
+            return input[j];
         }
 
-        protected override bool FindFirstChar()
+        /// <summary>
+        /// The responsibility of FindFirstChar() is to advance runtextpos
+        /// until it is at the next position which is a candidate for the
+        /// beginning of a successful match.
+        /// </summary>
+        private bool FindFirstChar(ReadOnlySpan<char> input)
         {
             if (0 != (_code.Anchors & (RegexFCD.Beginning | RegexFCD.Start | RegexFCD.EndZ | RegexFCD.End)))
             {
                 if (!_code.RightToLeft)
                 {
-                    if ((0 != (_code.Anchors & RegexFCD.Beginning) && runtextpos > runtextbeg) ||
-                        (0 != (_code.Anchors & RegexFCD.Start) && runtextpos > runtextstart))
+                    if ((0 != (_code.Anchors & RegexFCD.Beginning) && _runtextpos > _runtextbeg) ||
+                        (0 != (_code.Anchors & RegexFCD.Start) && _runtextpos > _runtextstart))
                     {
-                        runtextpos = runtextend;
+                        _runtextpos = _runtextend;
                         return false;
                     }
-                    if (0 != (_code.Anchors & RegexFCD.EndZ) && runtextpos < runtextend - 1)
+                    if (0 != (_code.Anchors & RegexFCD.EndZ) && _runtextpos < _runtextend - 1)
                     {
-                        runtextpos = runtextend - 1;
+                        _runtextpos = _runtextend - 1;
                     }
-                    else if (0 != (_code.Anchors & RegexFCD.End) && runtextpos < runtextend)
+                    else if (0 != (_code.Anchors & RegexFCD.End) && _runtextpos < _runtextend)
                     {
-                        runtextpos = runtextend;
+                        _runtextpos = _runtextend;
                     }
                 }
                 else
                 {
-                    if ((0 != (_code.Anchors & RegexFCD.End) && runtextpos < runtextend) ||
-                        (0 != (_code.Anchors & RegexFCD.EndZ) && (runtextpos < runtextend - 1 ||
-                                                               (runtextpos == runtextend - 1 && CharAt(runtextpos) != '\n'))) ||
-                        (0 != (_code.Anchors & RegexFCD.Start) && runtextpos < runtextstart))
+                    if ((0 != (_code.Anchors & RegexFCD.End) && _runtextpos < _runtextend) ||
+                        (0 != (_code.Anchors & RegexFCD.EndZ) && (_runtextpos < _runtextend - 1 ||
+                                                               (_runtextpos == _runtextend - 1 && CharAt(input, _runtextpos) != '\n'))) ||
+                        (0 != (_code.Anchors & RegexFCD.Start) && _runtextpos < _runtextstart))
                     {
-                        runtextpos = runtextbeg;
+                        _runtextpos = _runtextbeg;
                         return false;
                     }
-                    if (0 != (_code.Anchors & RegexFCD.Beginning) && runtextpos > runtextbeg)
+                    if (0 != (_code.Anchors & RegexFCD.Beginning) && _runtextpos > _runtextbeg)
                     {
-                        runtextpos = runtextbeg;
+                        _runtextpos = _runtextbeg;
                     }
                 }
 
                 if (_code.BMPrefix != null)
                 {
-                    return _code.BMPrefix.IsMatch(runtext, runtextpos, runtextbeg, runtextend);
+                    return _code.BMPrefix.IsMatch(input, _runtextpos, _runtextbeg, _runtextend);
                 }
 
                 return true; // found a valid start or end anchor
             }
             else if (_code.BMPrefix != null)
             {
-                runtextpos = _code.BMPrefix.Scan(runtext, runtextpos, runtextbeg, runtextend);
+                _runtextpos = _code.BMPrefix.Scan(input, _runtextpos, _runtextbeg, _runtextend);
 
-                if (runtextpos == -1)
+                if (_runtextpos == -1)
                 {
-                    runtextpos = (_code.RightToLeft ? runtextbeg : runtextend);
+                    _runtextpos = (_code.RightToLeft ? _runtextbeg : _runtextend);
                     return false;
                 }
 
@@ -423,7 +921,7 @@ namespace System.Text.RegularExpressions
 
                 for (int i = Forwardchars(); i > 0; i--)
                 {
-                    if (ch == Forwardcharnext())
+                    if (ch == Forwardcharnext(input))
                     {
                         Backwardnext();
                         return true;
@@ -434,7 +932,7 @@ namespace System.Text.RegularExpressions
             {
                 for (int i = Forwardchars(); i > 0; i--)
                 {
-                    if (RegexCharClass.CharInClass(Forwardcharnext(), set))
+                    if (RegexCharClass.CharInClass(Forwardcharnext(input), set))
                     {
                         Backwardnext();
                         return true;
@@ -445,7 +943,13 @@ namespace System.Text.RegularExpressions
             return false;
         }
 
-        protected override void Go()
+        /// <summary>
+        /// The responsibility of Go() is to run the regular expression at
+        /// runtextpos and call Capture() on all the captured subexpressions,
+        /// then to leave runtextpos at the ending position. It should leave
+        /// runtextpos where it started if there was no match.
+        /// </summary>
+        private void Go(ReadOnlySpan<char> input)
         {
             Goto(0);
 
@@ -460,13 +964,13 @@ namespace System.Text.RegularExpressions
                     advance = -1;
                 }
 #if DEBUG
-                if (runmatch.Debug)
+                if (_runmatch.Debug)
                 {
-                    DumpState();
+                    DumpState(input);
                 }
 #endif
 
-                CheckTimeout();
+                CheckTimeout(input);
 
                 switch (Operator())
                 {
@@ -812,37 +1316,37 @@ namespace System.Text.RegularExpressions
                         break;
 
                     case RegexCode.Bol:
-                        if (Leftchars() > 0 && CharAt(Textpos() - 1) != '\n')
+                        if (Leftchars() > 0 && CharAt(input, Textpos() - 1) != '\n')
                             break;
                         advance = 0;
                         continue;
 
                     case RegexCode.Eol:
-                        if (Rightchars() > 0 && CharAt(Textpos()) != '\n')
+                        if (Rightchars() > 0 && CharAt(input, Textpos()) != '\n')
                             break;
                         advance = 0;
                         continue;
 
                     case RegexCode.Boundary:
-                        if (!IsBoundary(Textpos(), runtextbeg, runtextend))
+                        if (!IsBoundary(input, Textpos(), _runtextbeg, _runtextend))
                             break;
                         advance = 0;
                         continue;
 
                     case RegexCode.Nonboundary:
-                        if (IsBoundary(Textpos(), runtextbeg, runtextend))
+                        if (IsBoundary(input, Textpos(), _runtextbeg, _runtextend))
                             break;
                         advance = 0;
                         continue;
 
                     case RegexCode.ECMABoundary:
-                        if (!IsECMABoundary(Textpos(), runtextbeg, runtextend))
+                        if (!IsECMABoundary(input, Textpos(), _runtextbeg, _runtextend))
                             break;
                         advance = 0;
                         continue;
 
                     case RegexCode.NonECMABoundary:
-                        if (IsECMABoundary(Textpos(), runtextbeg, runtextend))
+                        if (IsECMABoundary(input, Textpos(), _runtextbeg, _runtextend))
                             break;
                         advance = 0;
                         continue;
@@ -860,7 +1364,7 @@ namespace System.Text.RegularExpressions
                         continue;
 
                     case RegexCode.EndZ:
-                        if (Rightchars() > 1 || Rightchars() == 1 && CharAt(Textpos()) != '\n')
+                        if (Rightchars() > 1 || Rightchars() == 1 && CharAt(input, Textpos()) != '\n')
                             break;
                         advance = 0;
                         continue;
@@ -872,21 +1376,21 @@ namespace System.Text.RegularExpressions
                         continue;
 
                     case RegexCode.One:
-                        if (Forwardchars() < 1 || Forwardcharnext() != (char)Operand(0))
+                        if (Forwardchars() < 1 || Forwardcharnext(input) != (char)Operand(0))
                             break;
 
                         advance = 1;
                         continue;
 
                     case RegexCode.Notone:
-                        if (Forwardchars() < 1 || Forwardcharnext() == (char)Operand(0))
+                        if (Forwardchars() < 1 || Forwardcharnext(input) == (char)Operand(0))
                             break;
 
                         advance = 1;
                         continue;
 
                     case RegexCode.Set:
-                        if (Forwardchars() < 1 || !RegexCharClass.CharInClass(Forwardcharnext(), _code.Strings[Operand(0)]))
+                        if (Forwardchars() < 1 || !RegexCharClass.CharInClass(Forwardcharnext(input), _code.Strings[Operand(0)]))
                             break;
 
                         advance = 1;
@@ -894,7 +1398,7 @@ namespace System.Text.RegularExpressions
 
                     case RegexCode.Multi:
                         {
-                            if (!Stringmatch(_code.Strings[Operand(0)]))
+                            if (!Stringmatch(input, _code.Strings[Operand(0)]))
                                 break;
 
                             advance = 1;
@@ -907,12 +1411,12 @@ namespace System.Text.RegularExpressions
 
                             if (IsMatched(capnum))
                             {
-                                if (!Refmatch(MatchIndex(capnum), MatchLength(capnum)))
+                                if (!Refmatch(input, MatchIndex(capnum), MatchLength(capnum)))
                                     break;
                             }
                             else
                             {
-                                if ((runregex.roptions & RegexOptions.ECMAScript) == 0)
+                                if ((_runregex.roptions & RegexOptions.ECMAScript) == 0)
                                     break;
                             }
 
@@ -930,7 +1434,7 @@ namespace System.Text.RegularExpressions
                             char ch = (char)Operand(0);
 
                             while (c-- > 0)
-                                if (Forwardcharnext() != ch)
+                                if (Forwardcharnext(input) != ch)
                                     goto BreakBackward;
 
                             advance = 2;
@@ -947,7 +1451,7 @@ namespace System.Text.RegularExpressions
                             char ch = (char)Operand(0);
 
                             while (c-- > 0)
-                                if (Forwardcharnext() == ch)
+                                if (Forwardcharnext(input) == ch)
                                     goto BreakBackward;
 
                             advance = 2;
@@ -964,7 +1468,7 @@ namespace System.Text.RegularExpressions
                             string set = _code.Strings[Operand(0)];
 
                             while (c-- > 0)
-                                if (!RegexCharClass.CharInClass(Forwardcharnext(), set))
+                                if (!RegexCharClass.CharInClass(Forwardcharnext(input), set))
                                     goto BreakBackward;
 
                             advance = 2;
@@ -983,7 +1487,7 @@ namespace System.Text.RegularExpressions
 
                             for (i = c; i > 0; i--)
                             {
-                                if (Forwardcharnext() != ch)
+                                if (Forwardcharnext(input) != ch)
                                 {
                                     Backwardnext();
                                     break;
@@ -1009,7 +1513,7 @@ namespace System.Text.RegularExpressions
 
                             for (i = c; i > 0; i--)
                             {
-                                if (Forwardcharnext() == ch)
+                                if (Forwardcharnext(input) == ch)
                                 {
                                     Backwardnext();
                                     break;
@@ -1035,7 +1539,7 @@ namespace System.Text.RegularExpressions
 
                             for (i = c; i > 0; i--)
                             {
-                                if (!RegexCharClass.CharInClass(Forwardcharnext(), set))
+                                if (!RegexCharClass.CharInClass(Forwardcharnext(input), set))
                                 {
                                     Backwardnext();
                                     break;
@@ -1115,7 +1619,7 @@ namespace System.Text.RegularExpressions
                             int pos = TrackPeek(1);
                             Textto(pos);
 
-                            if (Forwardcharnext() != (char)Operand(0))
+                            if (Forwardcharnext(input) != (char)Operand(0))
                                 break;
 
                             int i = TrackPeek();
@@ -1133,7 +1637,7 @@ namespace System.Text.RegularExpressions
                             int pos = TrackPeek(1);
                             Textto(pos);
 
-                            if (Forwardcharnext() == (char)Operand(0))
+                            if (Forwardcharnext(input) == (char)Operand(0))
                                 break;
 
                             int i = TrackPeek();
@@ -1151,7 +1655,7 @@ namespace System.Text.RegularExpressions
                             int pos = TrackPeek(1);
                             Textto(pos);
 
-                            if (!RegexCharClass.CharInClass(Forwardcharnext(), _code.Strings[Operand(0)]))
+                            if (!RegexCharClass.CharInClass(Forwardcharnext(input), _code.Strings[Operand(0)]))
                                 break;
 
                             int i = TrackPeek();
@@ -1176,9 +1680,73 @@ namespace System.Text.RegularExpressions
         }
 
 #if DEBUG
-        internal override void DumpState()
+        private static string StackDescription(int[] a, int index)
         {
-            base.DumpState();
+            var sb = new StringBuilder();
+
+            sb.Append(a.Length - index);
+            sb.Append('/');
+            sb.Append(a.Length);
+
+            if (sb.Length < 8)
+                sb.Append(' ', 8 - sb.Length);
+
+            sb.Append('(');
+
+            for (int i = index; i < a.Length; i++)
+            {
+                if (i > index)
+                    sb.Append(' ');
+                sb.Append(a[i]);
+            }
+
+            sb.Append(')');
+
+            return sb.ToString();
+        }
+
+        private string TextposDescription(ReadOnlySpan<char> input)
+        {
+            var sb = new StringBuilder();
+            int remaining;
+
+            sb.Append(_runtextpos);
+
+            if (sb.Length < 8)
+                sb.Append(' ', 8 - sb.Length);
+
+            if (_runtextpos > _runtextbeg)
+                sb.Append(RegexCharClass.CharDescription(input[_runtextpos - 1]));
+            else
+                sb.Append('^');
+
+            sb.Append('>');
+
+            remaining = _runtextend - _runtextpos;
+
+            for (int i = _runtextpos; i < _runtextend; i++)
+            {
+                sb.Append(RegexCharClass.CharDescription(input[i]));
+            }
+            if (sb.Length >= 64)
+            {
+                sb.Length = 61;
+                sb.Append("...");
+            }
+            else
+            {
+                sb.Append('$');
+            }
+
+            return sb.ToString();
+        }
+
+        private void DumpState(ReadOnlySpan<char> input)
+        {
+            Debug.WriteLine("Text:  " + TextposDescription(input));
+            Debug.WriteLine("Track: " + StackDescription(_runtrack, _runtrackpos));
+            Debug.WriteLine("Stack: " + StackDescription(_runstack, _runstackpos));
+
             Debug.WriteLine("       " + _code.OpcodeDescription(_codepos) +
                               ((_operator & RegexCode.Back) != 0 ? " Back" : "") +
                               ((_operator & RegexCode.Back2) != 0 ? " Back2" : ""));

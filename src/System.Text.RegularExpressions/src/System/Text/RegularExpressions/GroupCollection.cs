@@ -40,9 +40,9 @@ namespace System.Text.RegularExpressions
 
         public Group this[int groupnum] => GetGroup(groupnum);
 
-        public Group this[string groupname] => _match._regex == null ?
+        public Group this[string groupname] => _match.Regex == null ?
             Group.s_emptyGroup :
-            GetGroup(_match._regex.GroupNumberFromName(groupname));
+            GetGroup(_match.Regex.GroupNumberFromName(groupname));
 
         /// <summary>
         /// Provides an enumerator in the same order as Item[].
@@ -83,7 +83,7 @@ namespace System.Text.RegularExpressions
                 _groups = new Group[_match._matchcount.Length - 1];
                 for (int i = 0; i < _groups.Length; i++)
                 {
-                    string groupname = _match._regex.GroupNameFromNumber(i + 1);
+                    string groupname = _match.Regex.GroupNameFromNumber(i + 1);
                     _groups[i] = new Group(_match.Text, _match._matches[i + 1], _match._matchcount[i + 1], groupname);
                 }
             }
@@ -224,7 +224,7 @@ namespace System.Text.RegularExpressions
 
         public bool ContainsKey(string key)
         {
-            return _match._regex.GroupNumberFromName(key) >= 0;
+            return _match.Regex.GroupNumberFromName(key) >= 0;
         }
 
         public IEnumerable<string> Keys

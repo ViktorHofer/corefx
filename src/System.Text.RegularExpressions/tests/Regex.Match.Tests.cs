@@ -5,7 +5,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
-using System.Linq;
 using Xunit;
 
 namespace System.Text.RegularExpressions.Tests
@@ -311,30 +310,47 @@ namespace System.Text.RegularExpressions.Tests
             {
                 if (isDefaultStart && isDefaultCount)
                 {
-                    // Use Match(string) or Match(string, string)
+                    // Use Match(string) & Match(Memory)
                     VerifyMatch(new Regex(pattern).Match(input), expectedSuccess, expectedValue);
-                    VerifyMatch(Regex.Match(input, pattern), expectedSuccess, expectedValue);
+                    VerifyMatch(new Regex(pattern).Match(input.AsMemory()), expectedSuccess, expectedValue);
 
+                    // Match(string, string) & Match(Memory, string)
+                    VerifyMatch(Regex.Match(input, pattern), expectedSuccess, expectedValue);
+                    VerifyMatch(Regex.Match(input.AsMemory(), pattern), expectedSuccess, expectedValue);
+
+                    // Use IsMatch(string) & IsMatch(Span)
                     Assert.Equal(expectedSuccess, new Regex(pattern).IsMatch(input));
+                    Assert.Equal(expectedSuccess, new Regex(pattern).IsMatch(input.AsSpan()));
+
+                    // Use IsMatch(string, string) & IsMatch(Span, string)
                     Assert.Equal(expectedSuccess, Regex.IsMatch(input, pattern));
+                    Assert.Equal(expectedSuccess, Regex.IsMatch(input.AsSpan(), pattern));
                 }
                 if (beginning + length == input.Length)
                 {
                     // Use Match(string, int)
                     VerifyMatch(new Regex(pattern).Match(input, beginning), expectedSuccess, expectedValue);
 
+                    // Use IsMatch(string, int)
                     Assert.Equal(expectedSuccess, new Regex(pattern).IsMatch(input, beginning));
                 }
-                // Use Match(string, int, int)
+                // Use Match(string, int, int) & Match(Memory, int, int)
+                VerifyMatch(new Regex(pattern).Match(input, beginning, length), expectedSuccess, expectedValue);
                 VerifyMatch(new Regex(pattern).Match(input, beginning, length), expectedSuccess, expectedValue);
             }
             if (isDefaultStart && isDefaultCount)
             {
-                // Use Match(string) or Match(string, string, RegexOptions)
+                // Use Match(string) & Match(Memory)
                 VerifyMatch(new Regex(pattern, options).Match(input), expectedSuccess, expectedValue);
-                VerifyMatch(Regex.Match(input, pattern, options), expectedSuccess, expectedValue);
+                VerifyMatch(new Regex(pattern, options).Match(input.AsMemory()), expectedSuccess, expectedValue);
 
+                // Use Match(string, string, RegexOptions) & Match(Memory, string, RegexOptions)
+                VerifyMatch(Regex.Match(input, pattern, options), expectedSuccess, expectedValue);
+                VerifyMatch(Regex.Match(input.AsMemory(), pattern, options), expectedSuccess, expectedValue);
+
+                // Use IsMatch(string, string, RegexOptions) & IsMatch(Span, string, RegexOptions)
                 Assert.Equal(expectedSuccess, Regex.IsMatch(input, pattern, options));
+                Assert.Equal(expectedSuccess, Regex.IsMatch(input.AsSpan(), pattern, options));
             }
             if (beginning + length == input.Length && (options & RegexOptions.RightToLeft) == 0)
             {
@@ -349,11 +365,13 @@ namespace System.Text.RegularExpressions.Tests
         {
             Assert.Equal(expectedSuccess, match.Success);
             Assert.Equal(expectedValue, match.Value);
+            Assert.Equal(expectedValue, match.ValueSpan.ToString());
 
             // Groups can never be empty
             Assert.True(match.Groups.Count >= 1);
             Assert.Equal(expectedSuccess, match.Groups[0].Success);
             Assert.Equal(expectedValue, match.Groups[0].Value);
+            Assert.Equal(expectedValue, match.Groups[0].ValueSpan.ToString());
         }
 
         [Fact]
@@ -668,18 +686,28 @@ namespace System.Text.RegularExpressions.Tests
             {
                 if (isDefaultStart && isDefaultCount)
                 {
-                    // Use Match(string) or Match(string, string)
+                    // Use Match(string) & Match(Memory)
                     VerifyMatch(new Regex(pattern).Match(input), true, expected);
-                    VerifyMatch(Regex.Match(input, pattern), true, expected);
+                    VerifyMatch(new Regex(pattern).Match(input.AsMemory()), true, expected);
 
+                    // Use Match(string, string) & Match(Memory, string)
+                    VerifyMatch(Regex.Match(input, pattern), true, expected);
+                    VerifyMatch(Regex.Match(input.AsMemory(), pattern), true, expected);
+
+                    // Use IsMatch(string) & IsMatch(Span)
                     Assert.True(new Regex(pattern).IsMatch(input));
+                    Assert.True(new Regex(pattern).IsMatch(input.AsSpan()));
+
+                    // Use IsMatch(string, string) & IsMatch(Span, string)
                     Assert.True(Regex.IsMatch(input, pattern));
+                    Assert.True(Regex.IsMatch(input.AsSpan(), pattern));
                 }
                 if (beginning + length == input.Length)
                 {
                     // Use Match(string, int)
                     VerifyMatch(new Regex(pattern).Match(input, beginning), true, expected);
 
+                    // Use IsMatch(string, int)
                     Assert.True(new Regex(pattern).IsMatch(input, beginning));
                 }
                 else
@@ -690,11 +718,17 @@ namespace System.Text.RegularExpressions.Tests
             }
             if (isDefaultStart && isDefaultCount)
             {
-                // Use Match(string) or Match(string, string, RegexOptions)
+                // Use Match(string) & Match(Memory)
                 VerifyMatch(new Regex(pattern, options).Match(input), true, expected);
-                VerifyMatch(Regex.Match(input, pattern, options), true, expected);
+                VerifyMatch(new Regex(pattern, options).Match(input.AsMemory()), true, expected);
 
+                // Use Match(string, string, RegexOptions) & Match(Memory, string, RegexOptions)
+                VerifyMatch(Regex.Match(input, pattern, options), true, expected);
+                VerifyMatch(Regex.Match(input.AsMemory(), pattern, options), true, expected);
+
+                // Use IsMatch(string, string, RegexOptions) & IsMatch(Span, string, RegexOptions)
                 Assert.True(Regex.IsMatch(input, pattern, options));
+                Assert.True(Regex.IsMatch(input.AsSpan(), pattern, options));
             }
             if (beginning + length == input.Length)
             {
@@ -713,11 +747,13 @@ namespace System.Text.RegularExpressions.Tests
             Assert.Equal(expectedSuccess, match.Success);
 
             Assert.Equal(expected[0].Value, match.Value);
+            Assert.Equal(expected[0].Value, match.ValueSpan.ToString());
             Assert.Equal(expected[0].Index, match.Index);
             Assert.Equal(expected[0].Length, match.Length);
 
             Assert.Equal(1, match.Captures.Count);
             Assert.Equal(expected[0].Value, match.Captures[0].Value);
+            Assert.Equal(expected[0].Value, match.Captures[0].ValueSpan.ToString());
             Assert.Equal(expected[0].Index, match.Captures[0].Index);
             Assert.Equal(expected[0].Length, match.Captures[0].Length);
 
@@ -727,6 +763,7 @@ namespace System.Text.RegularExpressions.Tests
                 Assert.Equal(expectedSuccess, match.Groups[i].Success);
 
                 Assert.Equal(expected[i].Value, match.Groups[i].Value);
+                Assert.Equal(expected[i].Value, match.Groups[i].ValueSpan.ToString());
                 Assert.Equal(expected[i].Index, match.Groups[i].Index);
                 Assert.Equal(expected[i].Length, match.Groups[i].Length);
 
@@ -734,6 +771,7 @@ namespace System.Text.RegularExpressions.Tests
                 for (int j = 0; j < match.Groups[i].Captures.Count; j++)
                 {
                     Assert.Equal(expected[i].Captures[j].Value, match.Groups[i].Captures[j].Value);
+                    Assert.Equal(expected[i].Captures[j].Value, match.Groups[i].Captures[j].ValueSpan.ToString());
                     Assert.Equal(expected[i].Captures[j].Index, match.Groups[i].Captures[j].Index);
                     Assert.Equal(expected[i].Captures[j].Length, match.Groups[i].Captures[j].Length);
                 }
@@ -748,7 +786,13 @@ namespace System.Text.RegularExpressions.Tests
         [InlineData("abc", "abc", "abc", "abc")]
         public void Result(string pattern, string input, string replacement, string expected)
         {
+            // Use Match.Result(string)
             Assert.Equal(expected, new Regex(pattern).Match(input).Result(replacement));
+
+            // Use Match.Result(string, Span)
+            Span<char> output = stackalloc char[255];
+            bool success = new Regex(pattern).Match(input.AsMemory()).TryResult(replacement, output, out int charsWritten);
+            SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
         }
 
         [Fact]
@@ -756,8 +800,10 @@ namespace System.Text.RegularExpressions.Tests
         {
             Match match = Regex.Match("foo", "foo");
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => match.Result(null));
+            AssertExtensions.Throws<ArgumentNullException>("replacement", () => match.TryResult(null, default, out _));
 
             Assert.Throws<NotSupportedException>(() => RegularExpressions.Match.Empty.Result("any"));
+            Assert.Throws<NotSupportedException>(() => RegularExpressions.Match.Empty.TryResult("any", default, out _));
         }
 
         [Fact]
@@ -766,6 +812,7 @@ namespace System.Text.RegularExpressions.Tests
             RemoteInvoke(() =>
             {
                 CultureInfo.CurrentCulture = new CultureInfo("en-US");
+                Match("\u0131", "\u0049", RegexOptions.IgnoreCase, 0, 1, false, string.Empty);
                 Match("\u0131", "\u0049", RegexOptions.IgnoreCase, 0, 1, false, string.Empty);
                 Match("\u0131", "\u0069", RegexOptions.IgnoreCase, 0, 1, false, string.Empty);
 
@@ -796,9 +843,15 @@ namespace System.Text.RegularExpressions.Tests
             {
                 // Should not throw out of memory
                 Assert.False(Regex.IsMatch("a", @"a{2147483647,}"));
-                Assert.False(Regex.IsMatch("a", @"a{1000001,}")); // 1 over the cutoff for Boyer-Moore prefix
+                Assert.False(Regex.IsMatch("a".AsSpan(), @"a{2147483647,}"));
 
-                Assert.False(Regex.IsMatch("a", @"a{50000}")); // creates string for Boyer-Moore but not so large that tests fail and start paging
+                // 1 over the cutoff for Boyer-Moore prefix
+                Assert.False(Regex.IsMatch("a", @"a{1000001,}"));
+                Assert.False(Regex.IsMatch("a".AsSpan(), @"a{1000001,}"));
+
+                // creates string for Boyer-Moore but not so large that tests fail and start paging
+                Assert.False(Regex.IsMatch("a", @"a{50000}"));
+                Assert.False(Regex.IsMatch("a".AsSpan(), @"a{50000}"));
             }).Dispose();
         }
 
@@ -808,16 +861,17 @@ namespace System.Text.RegularExpressions.Tests
             // Input is null
             AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match(null, "pattern"));
             AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match(null, "pattern", RegexOptions.None));
-            AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match(null, "pattern", RegexOptions.None, TimeSpan.FromSeconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => Regex.Match((string)null, "pattern", RegexOptions.None, TimeSpan.FromSeconds(1)));
 
-            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match(null));
-            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match(null, 0));
-            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match(null, 0, 0));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match((string)null));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match((string)null, 0));
+            AssertExtensions.Throws<ArgumentNullException>("input", () => new Regex("pattern").Match((string)null, 0, 0));
 
             // Pattern is null
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Match("input", null));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Match("input", null, RegexOptions.None));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Match("input", null, RegexOptions.None, TimeSpan.FromSeconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Match("input".AsMemory(), null, RegexOptions.None, TimeSpan.FromSeconds(1)));
 
             // Start is invalid
             Assert.Throws<ArgumentOutOfRangeException>(() => new Regex("pattern").Match("input", -1));
@@ -829,7 +883,7 @@ namespace System.Text.RegularExpressions.Tests
             AssertExtensions.Throws<ArgumentOutOfRangeException>("length", () => new Regex("pattern").Match("input", 0, -1));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("length", () => new Regex("pattern").Match("input", 0, 6));
         }
-
+        
         [Fact]
         public void IsMatch_Invalid()
         {
@@ -843,8 +897,11 @@ namespace System.Text.RegularExpressions.Tests
 
             // Pattern is null
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.IsMatch("input", null));
+            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.IsMatch("input".AsSpan(), null));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.IsMatch("input", null, RegexOptions.None));
+            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.IsMatch("input".AsSpan(), null, RegexOptions.None));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.IsMatch("input", null, RegexOptions.None, TimeSpan.FromSeconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.IsMatch("input".AsSpan(), null, RegexOptions.None, TimeSpan.FromSeconds(1)));
 
             // Start is invalid
             Assert.Throws<ArgumentOutOfRangeException>(() => new Regex("pattern").IsMatch("input", -1));

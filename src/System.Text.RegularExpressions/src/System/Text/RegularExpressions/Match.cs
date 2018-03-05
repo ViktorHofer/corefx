@@ -25,6 +25,7 @@
 // values are indices into the _matches array transformed by the formula -3-x.  This formula also untransforms.
 //
 
+using System.Buffers;
 using System.Collections;
 using System.Globalization;
 
@@ -36,25 +37,22 @@ namespace System.Text.RegularExpressions
     public class Match : Group
     {
         private const int ReplaceBufferSize = 256;
-        internal GroupCollection _groupcoll;
 
-        // input to the match
-        internal Regex _regex;
-        internal int _textbeg;
-        internal int _textpos;
-        internal int _textend;
-        internal int _textstart;
+        private protected GroupCollection _groupcoll;
+        private int _textbeg;
+        private int _textend;
+        private int _textstart;
 
         // output from the match
         internal int[][] _matches;
         internal int[] _matchcount;
-        internal bool _balancing;        // whether we've done any balancing with this match.  If we
-                                         // have done balancing, we'll need to do extra work in Tidy().
+        internal bool _balancing;        // whether we've done any balancing with this match.  If we have done balancing, 
+                                         // we'll need to do extra work in Tidy().
 
-        internal Match(Regex regex, int capcount, string text, int begpos, int len, int startpos)
+        internal Match(Regex regex, int capcount, in MemoryOrPinnedSpan<char> text, int begpos, int len, int startpos)
             : base(text, new int[2], 0, "0")
         {
-            _regex = regex;
+            Regex = regex;
             _matchcount = new int[capcount];
             _matches = new int[capcount][];
             _matches[0] = _caps;
@@ -64,18 +62,28 @@ namespace System.Text.RegularExpressions
             _balancing = false;
 
             // No need for an exception here.  This is only called internally, so we'll use an Assert instead
-            System.Diagnostics.Debug.Assert(!(_textbeg < 0 || _textstart < _textbeg || _textend < _textstart || Text.Length < _textend),
+            System.Diagnostics.Debug.Assert(!(_textbeg < 0 || _textstart < _textbeg || _textend < _textstart),
                                             "The parameters are out of range.");
         }
 
         /// <summary>
         /// Returns an empty Match object.
         /// </summary>
-        public static Match Empty { get; } = new Match(null, 1, string.Empty, 0, 0, 0);
+        public static Match Empty { get; } = new Match(null, 1, default, 0, 0, 0);
 
-        internal virtual void Reset(Regex regex, string text, int textbeg, int textend, int textstart)
+        /// <summary>
+        /// Required for creating the next match and for evaluating a replacement pattern.
+        /// </summary>
+        internal Regex Regex { get; private set; }
+
+        internal int TextPos { get; private set; }
+
+        /// <summary>
+        /// Resets the Match for reusability.
+        /// </summary>
+        internal virtual void Reset(Regex regex, in MemoryOrPinnedSpan<char> text, int textbeg, int textend, int textstart)
         {
-            _regex = regex;
+            Regex = regex;
             Text = text;
             _textbeg = textbeg;
             _textend = textend;
@@ -107,10 +115,25 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public Match NextMatch()
         {
-            if (_regex == null)
+            if (Regex == null)
                 return this;
 
-            return _regex.Run(false, Length, Text, _textbeg, _textend - _textbeg, _textpos);
+            // Calls the internal worker and passes the original string text in the Memory to it.
+            return Regex.Run(false, Length, Text, ReadOnlySpan<char>.Empty, _textbeg, _textend - _textbeg, TextPos);
+        }
+
+        /// <summary>
+        /// Computes the next match by using the provided original text wrapped in a Span.
+        /// Also passes the Text ReadOnlyMemory to it which is usually default (empty) when
+        /// using this method.
+        /// </summary>
+        /// <param name="input">The original text wrapped in a ReadOnlySpan.</param>
+        internal Match NextMatch(ReadOnlySpan<char> input)
+        {
+            if (Regex == null)
+                return this;
+            
+            return Regex.Run(false, Length, Text, input, _textbeg, _textend - _textbeg, TextPos);
         }
 
         /// <summary>
@@ -120,37 +143,59 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public virtual string Result(string replacement)
         {
+            return ResultImpl(targetSpan: false, replacement, Span<char>.Empty, out _, out _);
+        }
+
+        /// <summary>
+        /// Writes the expansion of the passed replacement pattern into the output Span. 
+        /// For example, if the replacement pattern is ?$1$2?, Result returns the concatenation
+        /// of the Group(1) and Group(2)'s captured text. 
+        /// </summary>
+        /// <returns>Returns the amount of chars written into the output Span.</returns>
+        public virtual bool TryResult(string replacement, Span<char> destination, out int charsWritten)
+        {
+            ResultImpl(targetSpan: true, replacement, destination, out charsWritten, out bool spanSuccess);
+
+            return spanSuccess;
+        }
+
+        /// <summary>
+        /// Returns the replacement result for a single match. Works with both Spans and strings.
+        /// </summary>
+        private string ResultImpl(bool targetSpan, string replacement, Span<char> destination, out int charsWritten, out bool spanSuccess)
+        {
             if (replacement == null)
                 throw new ArgumentNullException(nameof(replacement));
-
-            if (_regex == null)
+            if (Regex == null)
                 throw new NotSupportedException(SR.NoResultOnFailed);
 
             // Gets the weakly cached replacement helper or creates one if there isn't one already.
-            RegexReplacement repl = RegexReplacement.GetOrCreate(_regex._replref, replacement, _regex.caps, _regex.capsize,
-                _regex.capnames, _regex.roptions);
+            RegexReplacement repl = RegexReplacement.GetOrCreate(Regex.ReplRef, replacement, Regex.caps, Regex.capsize, 
+                Regex.capnames, Regex.roptions);
             Span<char> charInitSpan = stackalloc char[ReplaceBufferSize];
             var vsb = new ValueStringBuilder(charInitSpan);
 
-            repl.ReplacementImpl(ref vsb, this);
+            repl.Replace(Text.Span, ref vsb, this);
 
-            return vsb.ToString();
+            // Writes the ValueStringBuilder's content either into the output Span or returns 
+            // a string depending on the targetSpan switch.
+            return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
-        internal virtual ReadOnlySpan<char> GroupToStringImpl(int groupnum)
+        internal ReadOnlySpan<char> GroupToStringImpl(ReadOnlySpan<char> input, int groupnum)
         {
             int c = _matchcount[groupnum];
             if (c == 0)
-                return string.Empty;
+                return ReadOnlySpan<char>.Empty;
 
             int[] matches = _matches[groupnum];
 
-            return Text.AsSpan(matches[(c - 1) * 2], matches[(c * 2) - 1]);
+            return input.Slice(matches[(c - 1) * 2], matches[(c * 2) - 1]);
         }
 
-        internal ReadOnlySpan<char> LastGroupToStringImpl()
+        internal ReadOnlySpan<char> LastGroupToStringImpl(ReadOnlySpan<char> input)
         {
-            return GroupToStringImpl(_matchcount.Length - 1);
+            return GroupToStringImpl(input, _matchcount.Length - 1);
         }
 
         /// <summary>
@@ -281,7 +326,7 @@ namespace System.Text.RegularExpressions
             int[] interval = _matches[0];
             Index = interval[0];
             Length = interval[1];
-            _textpos = textpos;
+            TextPos = textpos;
             _capcount = _matchcount[0];
 
             if (_balancing)
@@ -338,27 +383,30 @@ namespace System.Text.RegularExpressions
         {
             get
             {
-                if (_regex == null)
+                if (Regex == null)
                     return false;
 
-                return _regex.Debug;
+                return Regex.Debug;
             }
         }
 
         internal virtual void Dump()
         {
             int i, j;
+            ReadOnlySpan<char> span = Text.Span;
 
             for (i = 0; i < _matchcount.Length; i++)
             {
                 System.Diagnostics.Debug.WriteLine("Capnum " + i.ToString(CultureInfo.InvariantCulture) + ":");
+                if (span.Length == 0)
+                    continue;
 
                 for (j = 0; j < _matchcount[i]; j++)
                 {
                     string text = "";
 
                     if (_matches[i][j * 2] >= 0)
-                        text = Text.Substring(_matches[i][j * 2], _matches[i][j * 2 + 1]);
+                        text = span.Slice(_matches[i][j * 2], _matches[i][j * 2 + 1]).ToString();
 
                     System.Diagnostics.Debug.WriteLine("  (" + _matches[i][j * 2].ToString(CultureInfo.InvariantCulture) + "," + _matches[i][j * 2 + 1].ToString(CultureInfo.InvariantCulture) + ") " + text);
                 }
@@ -375,7 +423,7 @@ namespace System.Text.RegularExpressions
         // the lookup hashtable
         new internal readonly Hashtable _caps;
 
-        internal MatchSparse(Regex regex, Hashtable caps, int capcount, string text, int begpos, int len, int startpos)
+        internal MatchSparse(Regex regex, Hashtable caps, int capcount, in MemoryOrPinnedSpan<char> text, int begpos, int len, int startpos)
             : base(regex, capcount, text, begpos, len, startpos)
         {
             _caps = caps;

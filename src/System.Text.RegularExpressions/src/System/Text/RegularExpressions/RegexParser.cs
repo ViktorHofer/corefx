@@ -10,6 +10,7 @@
 // It would be nice to get rid of the comment modes, since the
 // ScanBlank() calls are just kind of duct-taped in.
 
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -116,20 +117,21 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// Escapes all metacharacters (including |,(,),[,{,|,^,$,*,+,?,\, spaces and #)
         /// </summary>
-        public static string Escape(string input)
+        public static string Escape(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             for (int i = 0; i < input.Length; i++)
             {
                 if (IsMetachar(input[i]))
                 {
-                    return EscapeImpl(input, i);
+                    return EscapeImpl(targetSpan, input, i, destination, out charsWritten, out spanSuccess);
                 }
             }
 
-            return input;
+            // If nothing to escape, return the input.
+            return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
-        private static string EscapeImpl(string input, int i)
+        private static string EscapeImpl(bool targetSpan, ReadOnlySpan<char> input, int i, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             // For small inputs we allocate on the stack. In most cases a buffer three 
             // times larger the original string should be sufficient as usually not all 
@@ -142,7 +144,7 @@ namespace System.Text.RegularExpressions
                 new ValueStringBuilder(input.Length + 200);
 
             char ch = input[i];
-            vsb.Append(input.AsSpan(0, i));
+            vsb.Append(input.Slice(0, i));
 
             do
             {
@@ -175,32 +177,33 @@ namespace System.Text.RegularExpressions
                     i++;
                 }
 
-                vsb.Append(input.AsSpan(lastpos, i - lastpos));
+                vsb.Append(input.Slice(lastpos, i - lastpos));
             } while (i < input.Length);
 
-            return vsb.ToString();
+            return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
         /// <summary>
         /// Unescapes all metacharacters (including (,),[,],{,},|,^,$,*,+,?,\, spaces and #)
         /// </summary>
-        public static string Unescape(string input)
+        public static string Unescape(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             for (int i = 0; i < input.Length; i++)
             {
                 if (input[i] == '\\')
                 {
-                    return UnescapeImpl(input, i);
+                    return UnescapeImpl(targetSpan, input, i, destination, out charsWritten, out spanSuccess);
                 }
             }
 
-            return input;
+            // If nothing to escape, return the input.
+            return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
-        private static string UnescapeImpl(string input, int i)
+        private static string UnescapeImpl(bool targetSpan, ReadOnlySpan<char> input, int i, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             Span<RegexOptions> optionSpan = stackalloc RegexOptions[OptionStackDefaultSize];
-            var parser = new RegexParser(input, RegexOptions.None, CultureInfo.InvariantCulture, optionSpan);
+            var parser = new RegexParser(input.ToString(), RegexOptions.None, CultureInfo.InvariantCulture, optionSpan);
 
             // In the worst case the escaped string has the same length.
             // For small inputs we use stack allocation.
@@ -209,7 +212,7 @@ namespace System.Text.RegularExpressions
                 new ValueStringBuilder(buffer) :
                 new ValueStringBuilder(input.Length);
 
-            vsb.Append(input.AsSpan(0, i));
+            vsb.Append(input.Slice(0, i));
             do
             {
                 i++;
@@ -220,12 +223,12 @@ namespace System.Text.RegularExpressions
                 int lastpos = i;
                 while (i < input.Length && input[i] != '\\')
                     i++;
-                vsb.Append(input.AsSpan(lastpos, i - lastpos));
+                vsb.Append(input.Slice(lastpos, i - lastpos));
             } while (i < input.Length);
 
             parser.Dispose();
 
-            return vsb.ToString();
+            return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
         /// <summary>
