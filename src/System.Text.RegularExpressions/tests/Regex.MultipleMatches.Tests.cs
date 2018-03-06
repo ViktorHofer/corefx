@@ -9,42 +9,52 @@ namespace System.Text.RegularExpressions.Tests
 {
     public class RegexMultipleMatchTests
     {
-
         [Fact]
         public void Matches_MultipleCapturingGroups()
+        {
+            // Another example - given by Brad Merril in an article on RegularExpressions
+            Regex regex = new Regex(@"(abra(cad)?)+");
+            string input = "abracadabra1abracadabra2abracadabra3";
+            ValidateMatch(regex.Match(input));
+            ValidateMatch(regex.Match(input.AsMemory()));
+        }
+
+        private static void ValidateMatch(Match match)
         {
             string[] expectedGroupValues = { "abracadabra", "abra", "cad" };
             string[] expectedGroupCaptureValues = { "abracad", "abra" };
 
-            // Another example - given by Brad Merril in an article on RegularExpressions
-            Regex regex = new Regex(@"(abra(cad)?)+");
-            string input = "abracadabra1abracadabra2abracadabra3";
-            Match match = regex.Match(input);
             while (match.Success)
             {
                 string expected = "abracadabra";
                 Assert.Equal(expected, match.Value);
+                Assert.Equal(expected, match.ValueMemory.Span.ToString());
 
                 Assert.Equal(3, match.Groups.Count);
                 for (int i = 0; i < match.Groups.Count; i++)
                 {
                     Assert.Equal(expectedGroupValues[i], match.Groups[i].Value);
+                    Assert.Equal(expectedGroupValues[i], match.Groups[i].ValueMemory.Span.ToString());
                     if (i == 1)
                     {
                         Assert.Equal(2, match.Groups[i].Captures.Count);
                         for (int j = 0; j < match.Groups[i].Captures.Count; j++)
                         {
                             Assert.Equal(expectedGroupCaptureValues[j], match.Groups[i].Captures[j].Value);
+                            Assert.Equal(expectedGroupCaptureValues[j], match.Groups[i].Captures[j].ValueMemory.Span.ToString());
                         }
                     }
                     else if (i == 2)
                     {
                         Assert.Equal(1, match.Groups[i].Captures.Count);
                         Assert.Equal("cad", match.Groups[i].Captures[0].Value);
+                        Assert.Equal("cad", match.Groups[i].Captures[0].ValueMemory.Span.ToString());
                     }
                 }
                 Assert.Equal(1, match.Captures.Count);
                 Assert.Equal("abracadabra", match.Captures[0].Value);
+                Assert.Equal("abracadabra", match.Captures[0].ValueMemory.Span.ToString());
+
                 match = match.NextMatch();
             }
         }
@@ -149,19 +159,41 @@ namespace System.Text.RegularExpressions.Tests
             if (options == RegexOptions.None)
             {
                 Regex regexBasic = new Regex(pattern);
-                VerifyMatches(regexBasic.Matches(input), expected);
-                VerifyMatches(regexBasic.Match(input), expected);
 
+                // Use Matches(string) & Matches(Memory)
+                VerifyMatches(regexBasic.Matches(input), expected);
+                VerifyMatches(regexBasic.Matches(input.AsMemory()), expected);
+
+                // Use Match(string) & Match(Memory)
+                VerifyMatches(regexBasic.Match(input), expected);
+                VerifyMatches(regexBasic.Match(input.AsMemory()), expected);
+
+                // Use Matches(string, string) & Matches(Memory, string)
                 VerifyMatches(Regex.Matches(input, pattern), expected);
+                VerifyMatches(Regex.Matches(input.AsMemory(), pattern), expected);
+
+                // Use Match(string, string) & Match(Memory, string)
                 VerifyMatches(Regex.Match(input, pattern), expected);
+                VerifyMatches(Regex.Match(input.AsMemory(), pattern), expected);
             }
 
             Regex regexAdvanced = new Regex(pattern, options);
-            VerifyMatches(regexAdvanced.Matches(input), expected);
-            VerifyMatches(regexAdvanced.Match(input), expected);
 
+            // Use Matches(string) & Matches(Memory)
+            VerifyMatches(regexAdvanced.Matches(input), expected);
+            VerifyMatches(regexAdvanced.Matches(input.AsMemory()), expected);
+
+            // Use Match(string) & Match(Memory)
+            VerifyMatches(regexAdvanced.Match(input), expected);
+            VerifyMatches(regexAdvanced.Match(input.AsMemory()), expected);
+
+            // Use Matches(string, string, RegexOptions) & (Memory, string, RegexOptions)
             VerifyMatches(Regex.Matches(input, pattern, options), expected);
+            VerifyMatches(Regex.Matches(input.AsMemory(), pattern, options), expected);
+
+            // Use Match(string, string, RegexOptions) & Match(Memory, pattern, RegexOptions)
             VerifyMatches(Regex.Match(input, pattern, options), expected);
+            VerifyMatches(Regex.Match(input.AsMemory(), pattern, options), expected);
         }
 
         public static void VerifyMatches(Match match, CaptureData[] expected)
@@ -185,15 +217,18 @@ namespace System.Text.RegularExpressions.Tests
         {
             Assert.True(match.Success);
             Assert.Equal(expected.Value, match.Value);
+            Assert.Equal(expected.Value, match.ValueMemory.Span.ToString());
             Assert.Equal(expected.Index, match.Index);
             Assert.Equal(expected.Length, match.Length);
 
             Assert.Equal(expected.Value, match.Groups[0].Value);
+            Assert.Equal(expected.Value, match.Groups[0].ValueMemory.Span.ToString());
             Assert.Equal(expected.Index, match.Groups[0].Index);
             Assert.Equal(expected.Length, match.Groups[0].Length);
 
             Assert.Equal(1, match.Captures.Count);
             Assert.Equal(expected.Value, match.Captures[0].Value);
+            Assert.Equal(expected.Value, match.Captures[0].ValueMemory.Span.ToString());
             Assert.Equal(expected.Index, match.Captures[0].Index);
             Assert.Equal(expected.Length, match.Captures[0].Length);
         }
@@ -213,20 +248,26 @@ namespace System.Text.RegularExpressions.Tests
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Matches("input", null));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Matches("input", null, RegexOptions.None));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Matches("input", null, RegexOptions.None, TimeSpan.FromSeconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Matches("input".AsMemory(), null, RegexOptions.None, TimeSpan.FromSeconds(1)));
 
             // Options are invalid
             AssertExtensions.Throws<ArgumentOutOfRangeException>("options", () => Regex.Matches("input", "pattern", (RegexOptions)(-1)));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("options", () => Regex.Matches("input", "pattern", (RegexOptions)(-1), TimeSpan.FromSeconds(1)));
+            AssertExtensions.Throws<ArgumentOutOfRangeException>("options", () => Regex.Matches("input".AsMemory(), "pattern", (RegexOptions)(-1), TimeSpan.FromSeconds(1)));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("options", () => Regex.Matches("input", "pattern", (RegexOptions)0x400));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("options", () => Regex.Matches("input", "pattern", (RegexOptions)0x400, TimeSpan.FromSeconds(1)));
+            AssertExtensions.Throws<ArgumentOutOfRangeException>("options", () => Regex.Matches("input".AsMemory(), "pattern", (RegexOptions)0x400, TimeSpan.FromSeconds(1)));
 
             // MatchTimeout is invalid
             AssertExtensions.Throws<ArgumentOutOfRangeException>("matchTimeout", () => Regex.Matches("input", "pattern", RegexOptions.None, TimeSpan.Zero));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("matchTimeout", () => Regex.Matches("input", "pattern", RegexOptions.None, TimeSpan.Zero));
+            AssertExtensions.Throws<ArgumentOutOfRangeException>("matchTimeout", () => Regex.Matches("input".AsMemory(), "pattern", RegexOptions.None, TimeSpan.Zero));
 
             // Start is invalid
             AssertExtensions.Throws<ArgumentOutOfRangeException>("startat", () => new Regex("pattern").Matches("input", -1));
+            AssertExtensions.Throws<ArgumentOutOfRangeException>("startat", () => new Regex("pattern").Matches("input".AsMemory(), -1));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("startat", () => new Regex("pattern").Matches("input", 6));
+            AssertExtensions.Throws<ArgumentOutOfRangeException>("startat", () => new Regex("pattern").Matches("input".AsMemory(), 6));
         }
 
         [Fact]
