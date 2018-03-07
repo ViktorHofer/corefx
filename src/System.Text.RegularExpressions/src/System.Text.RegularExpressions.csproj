@@ -13,7 +13,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'uap-Windows_NT-Debug|AnyCPU'" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'uap-Windows_NT-Release|AnyCPU'" />
   <ItemGroup>
-    <Compile Include="System\Buffers\CharOwnedMemory.cs" />
+    <Compile Include="System\Buffers\MemoryOrPinnedSpan.cs" />
     <Compile Include="System\Buffers\SpanHelpers.cs" />
     <Compile Include="System\Collections\Generic\ValueListBuilder.Pop.cs" />
     <Compile Include="System\Collections\HashtableExtensions.cs" />

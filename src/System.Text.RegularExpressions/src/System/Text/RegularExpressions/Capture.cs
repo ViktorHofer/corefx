@@ -7,6 +7,8 @@
 // search may return multiple Capture within each capturing
 // RegexGroup.
 
+using System.Buffers;
+
 namespace System.Text.RegularExpressions
 {
     /// <summary>
@@ -22,7 +24,7 @@ namespace System.Text.RegularExpressions
         /// and the length of the captured string.
         /// </summary>
         /// <param name="text">The input string provided by the user wrapped in a Memory.</param>
-        internal Capture(ReadOnlyMemory<char> text, int index, int length)
+        internal Capture(MemoryOrPinnedSpan<char> text, int index, int length)
         {
             Text = text;
             Index = index;
@@ -43,7 +45,7 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// The original string.
         /// </summary>
-        internal ReadOnlyMemory<char> Text { get; private protected set; }
+        internal MemoryOrPinnedSpan<char> Text { get; private protected set; }
 
         /*
          * The backing string won't be allocated until the proprety is accessed the first time.
@@ -51,12 +53,12 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// Returns the value of this Regex Capture.
         /// </summary>
-        public string Value => _value ?? (_value = Text.Span.Slice(Index, Length).ToString());
+        public string Value => _value ?? (_value = ValueSpan.ToString());
 
         /// <summary>
         /// Returns the value of this Regex Capture.
         /// </summary>
-        public ReadOnlyMemory<char> ValueMemory => Text.Slice(Index, Length);
+        public ReadOnlySpan<char> ValueSpan => Text.Span.Slice(Index, Length);
 
         /// <summary>
         /// Returns the substring that was matched.
@@ -71,6 +73,7 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// The substring to the right of the capture.
         /// </summary>
-        internal ReadOnlySpan<char> GetRightSubstring(ReadOnlySpan<char> input) => input.Slice(Index + Length, input.Length - Index - Length);
+        internal ReadOnlySpan<char> GetRightSubstring(ReadOnlySpan<char> input) =>
+            input.Slice(Index + Length, input.Length - Index - Length);
     }
 }

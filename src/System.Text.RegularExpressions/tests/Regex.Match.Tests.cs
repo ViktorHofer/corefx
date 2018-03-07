@@ -362,13 +362,13 @@ namespace System.Text.RegularExpressions.Tests
         {
             Assert.Equal(expectedSuccess, match.Success);
             Assert.Equal(expectedValue, match.Value);
-            Assert.Equal(expectedValue, match.ValueMemory.Span.ToString());
+            Assert.Equal(expectedValue, match.ValueSpan.ToString());
 
             // Groups can never be empty
             Assert.True(match.Groups.Count >= 1);
             Assert.Equal(expectedSuccess, match.Groups[0].Success);
             Assert.Equal(expectedValue, match.Groups[0].Value);
-            Assert.Equal(expectedValue, match.Groups[0].ValueMemory.Span.ToString());
+            Assert.Equal(expectedValue, match.Groups[0].ValueSpan.ToString());
         }
 
         [Fact]
@@ -731,13 +731,13 @@ namespace System.Text.RegularExpressions.Tests
             Assert.Equal(expectedSuccess, match.Success);
 
             Assert.Equal(expected[0].Value, match.Value);
-            Assert.Equal(expected[0].Value, match.ValueMemory.Span.ToString());
+            Assert.Equal(expected[0].Value, match.ValueSpan.ToString());
             Assert.Equal(expected[0].Index, match.Index);
             Assert.Equal(expected[0].Length, match.Length);
 
             Assert.Equal(1, match.Captures.Count);
             Assert.Equal(expected[0].Value, match.Captures[0].Value);
-            Assert.Equal(expected[0].Value, match.Captures[0].ValueMemory.Span.ToString());
+            Assert.Equal(expected[0].Value, match.Captures[0].ValueSpan.ToString());
             Assert.Equal(expected[0].Index, match.Captures[0].Index);
             Assert.Equal(expected[0].Length, match.Captures[0].Length);
 
@@ -747,7 +747,7 @@ namespace System.Text.RegularExpressions.Tests
                 Assert.Equal(expectedSuccess, match.Groups[i].Success);
 
                 Assert.Equal(expected[i].Value, match.Groups[i].Value);
-                Assert.Equal(expected[i].Value, match.Groups[i].ValueMemory.Span.ToString());
+                Assert.Equal(expected[i].Value, match.Groups[i].ValueSpan.ToString());
                 Assert.Equal(expected[i].Index, match.Groups[i].Index);
                 Assert.Equal(expected[i].Length, match.Groups[i].Length);
 
@@ -755,7 +755,7 @@ namespace System.Text.RegularExpressions.Tests
                 for (int j = 0; j < match.Groups[i].Captures.Count; j++)
                 {
                     Assert.Equal(expected[i].Captures[j].Value, match.Groups[i].Captures[j].Value);
-                    Assert.Equal(expected[i].Captures[j].Value, match.Groups[i].Captures[j].ValueMemory.Span.ToString());
+                    Assert.Equal(expected[i].Captures[j].Value, match.Groups[i].Captures[j].ValueSpan.ToString());
                     Assert.Equal(expected[i].Captures[j].Index, match.Groups[i].Captures[j].Index);
                     Assert.Equal(expected[i].Captures[j].Length, match.Groups[i].Captures[j].Length);
                 }

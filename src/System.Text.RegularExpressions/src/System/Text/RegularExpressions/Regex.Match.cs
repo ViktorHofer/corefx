@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System.Buffers;
+
 namespace System.Text.RegularExpressions
 {
     public partial class Regex
@@ -90,7 +92,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public bool IsMatch(ReadOnlySpan<char> input, int startat)
         {
-            return (Run(true, -1, ReadOnlyMemory<char>.Empty, input, 0, input.Length, startat) == null);
+            return (Run(true, -1, MemoryOrPinnedSpan<char>.Empty, input, 0, input.Length, startat) == null);
         }
 
         /// <summary>
@@ -198,7 +200,7 @@ namespace System.Text.RegularExpressions
 
         private Match Match(ReadOnlyMemory<char> input, int beginning, int length, int startat)
         {
-            return Run(false, -1, input, ReadOnlySpan<char>.Empty, beginning, length, startat);
+            return Run(false, -1, new MemoryOrPinnedSpan<char>(input), ReadOnlySpan<char>.Empty, beginning, length, startat);
         }
 
         /// <summary>
@@ -263,7 +265,7 @@ namespace System.Text.RegularExpressions
 
         public MatchCollection Matches(ReadOnlyMemory<char> input, int startat)
         {
-            return new MatchCollection(this, input, 0, input.Length, startat);
+            return new MatchCollection(this, new MemoryOrPinnedSpan<char>(input), 0, input.Length, startat);
         }
     }
 }

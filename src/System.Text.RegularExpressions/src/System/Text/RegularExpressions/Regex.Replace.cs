@@ -12,7 +12,7 @@ namespace System.Text.RegularExpressions
 {
     // Callback class
     public delegate string MatchEvaluator(Match match);
-    
+
     public partial class Regex
     {
         private const int ReplaceBufferSize = 256;
@@ -200,7 +200,7 @@ namespace System.Text.RegularExpressions
 
             // Generate the first Match by using the provided ReadOnlySpan and pass an empty input Memory to it to 
             // avoid the Span to Memory conversion costs (pinning/copying).
-            Match match = Run(false, -1, ReadOnlyMemory<char>.Empty, input, 0, input.Length, startat);
+            Match match = Run(false, -1, MemoryOrPinnedSpan<char>.Empty, input, 0, input.Length, startat);
 
             // If match fails, return the input text.
             if (!match.Success)
@@ -290,9 +290,8 @@ namespace System.Text.RegularExpressions
             // copying of the input.
             fixed (char* ptr = &MemoryMarshal.GetReference(input))
             {
-                var inputOwnedMem = new CharOwnedMemory((IntPtr)ptr, input.Length);
-                Memory<char> inputMem = inputOwnedMem.Memory;
-                Match match = Run(false, -1, inputMem, input, 0, input.Length, startat);
+                var mem = new MemoryOrPinnedSpan<char>(ptr, input.Length);
+                Match match = Run(false, -1, mem, input, 0, input.Length, startat);
                 
                 if (!match.Success)
                     return SpanHelpers.CopyInput(input, output, targetSpan, out charsWritten);
@@ -348,9 +347,6 @@ namespace System.Text.RegularExpressions
                     if (prevat > 0)
                         vsb.AppendReversed(input.Slice(0, prevat));
                 }
-
-                // Dispose the short living owned memory.
-                inputOwnedMem.Dispose();
 
                 // Return the transformed input text either by writing into the provided output Span or by returning a string, 
                 // depending on the targetSpan switch. In right to left mode, do a final reverse of the transformed input.

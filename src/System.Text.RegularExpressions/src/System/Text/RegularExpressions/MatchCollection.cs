@@ -5,6 +5,7 @@
 // The MatchCollection lists the successful matches that
 // result when searching a string for a regular expression.
 
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -27,13 +28,13 @@ namespace System.Text.RegularExpressions
         private readonly Regex _regex;
         private readonly List<Match> _matches;
         private bool _done;
-        private readonly ReadOnlyMemory<char> _input;
+        private readonly MemoryOrPinnedSpan<char> _input;
         private readonly int _beginning;
         private readonly int _length;
         private int _startat;
         private int _prevlen;
 
-        internal MatchCollection(Regex regex, ReadOnlyMemory<char> input, int beginning, int length, int startat)
+        internal MatchCollection(Regex regex, MemoryOrPinnedSpan<char> input, int beginning, int length, int startat)
         {
             if (startat < 0 || startat > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);

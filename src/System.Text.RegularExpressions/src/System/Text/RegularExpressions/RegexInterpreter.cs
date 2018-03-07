@@ -5,6 +5,7 @@
 // The RegexInterpreter executes a block of regular expression codes
 // while consuming input.
 
+using System.Buffers;
 using System.Diagnostics;
 using System.Globalization;
 
@@ -87,7 +88,7 @@ namespace System.Text.RegularExpressions
         /// and we could use a separate method Skip() that will quickly scan past
         /// any characters that we know can't match.
         /// </summary>
-        public Match Scan(Regex regex, ReadOnlyMemory<char> mem, ReadOnlySpan<char> input, int textbeg, int textend, int textstart, int prevlen, bool quick, TimeSpan timeout)
+        public Match Scan(Regex regex, MemoryOrPinnedSpan<char> mem, ReadOnlySpan<char> input, int textbeg, int textend, int textstart, int prevlen, bool quick, TimeSpan timeout)
         {
             _ignoreTimeout = (Regex.InfiniteMatchTimeout == timeout);
             _timeout = _ignoreTimeout
@@ -238,7 +239,7 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// Initializes all the data members that are used by Go()
         /// </summary>
-        private void InitMatch(ReadOnlyMemory<char> input)
+        private void InitMatch(MemoryOrPinnedSpan<char> input)
         {
             // Use a hashtabled Match object if the capture numbers are sparse
 

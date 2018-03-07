@@ -5,6 +5,7 @@
 // The Regex class represents a single compiled instance of a regular
 // expression.
 
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -462,10 +463,10 @@ namespace System.Text.RegularExpressions
         /// text as a Memory (with an empty Span). Replace with an MatchEvaluator is special as it's unidirectional but
         /// the evaluator can access the Match object which is the internal state and contains the input text.
         /// </summary>
-        internal Match Run(bool quick, int prevlen, ReadOnlyMemory<char> mem, ReadOnlySpan<char> span, int beginning, int length, int startat)
+        internal Match Run(bool quick, int prevlen, MemoryOrPinnedSpan<char> mem, ReadOnlySpan<char> span, int beginning, int length, int startat)
         {
             // If a non empty Span is passed, use it and avoid Span creation from Memory.
-            ReadOnlySpan<char> input = span != Span<char>.Empty ? span : mem.Span;
+            ReadOnlySpan<char> input = !span.IsEmpty ? span : mem.Span;
 
             if (startat < 0 || startat > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);
