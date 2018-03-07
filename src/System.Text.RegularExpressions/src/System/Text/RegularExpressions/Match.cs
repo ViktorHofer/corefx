@@ -152,9 +152,9 @@ namespace System.Text.RegularExpressions
         /// of the Group(1) and Group(2)'s captured text. 
         /// </summary>
         /// <returns>Returns the amount of chars written into the output Span.</returns>
-        public virtual int Result(string replacement, Span<char> output)
+        public virtual int Result(string replacement, Span<char> destination)
         {
-            ResultImpl(replacement, output, targetSpan: true, out int charsWritten);
+            ResultImpl(replacement, destination, targetSpan: true, out int charsWritten);
 
             return charsWritten;
         }
@@ -162,7 +162,7 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// Returns the replacement result for a single match. Works with both Spans and strings.
         /// </summary>
-        private string ResultImpl(string replacement, Span<char> output, bool targetSpan, out int charsWritten)
+        private string ResultImpl(string replacement, Span<char> destination, bool targetSpan, out int charsWritten)
         {
             if (replacement == null)
                 throw new ArgumentNullException(nameof(replacement));
@@ -179,7 +179,7 @@ namespace System.Text.RegularExpressions
 
             // Writes the ValueStringBuilder's content either into the output Span or returns 
             // a string dependening on the targetSpan switch.
-            return vsb.CopyOutput(output, false, targetSpan, out charsWritten);
+            return vsb.CopyOutput(destination, false, targetSpan, out charsWritten);
         }
 
         internal ReadOnlySpan<char> GroupToStringImpl(ReadOnlySpan<char> input, int groupnum)

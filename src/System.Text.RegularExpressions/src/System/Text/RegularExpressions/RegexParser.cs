@@ -102,7 +102,7 @@ namespace System.Text.RegularExpressions
         /*
          * Escapes all metacharacters (including |,(,),[,{,|,^,$,*,+,?,\, spaces and #)
          */
-        public static string Escape(ReadOnlySpan<char> input, Span<char> output, bool targetSpan, out int charsWritten)
+        public static string Escape(ReadOnlySpan<char> input, Span<char> destination, bool targetSpan, out int charsWritten)
         {
             for (int i = 0; i < input.Length; i++)
             {
@@ -149,12 +149,12 @@ namespace System.Text.RegularExpressions
                         vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return vsb.CopyOutput(output, false, targetSpan, out charsWritten);
+                    return vsb.CopyOutput(destination, false, targetSpan, out charsWritten);
                 }
             }
 
             // If nothing to escape, return the input.
-            return input.CopyInput(output, targetSpan, out charsWritten);
+            return input.CopyInput(destination, targetSpan, out charsWritten);
         }
 
         /*

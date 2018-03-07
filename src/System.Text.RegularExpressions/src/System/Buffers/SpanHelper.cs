@@ -8,11 +8,11 @@ namespace System.Buffers
 {
     internal static class SpanHelper
     {
-        public static string CopyInput(this ReadOnlySpan<char> input, Span<char> output, bool targetSpan, out int charsWritten)
+        public static string CopyInput(this ReadOnlySpan<char> input, Span<char> destination, bool targetSpan, out int charsWritten)
         {
             if (targetSpan)
             {
-                if (input.TryCopyTo(output))
+                if (input.TryCopyTo(destination))
                     charsWritten = input.Length;
                 else
                     charsWritten = 0;
@@ -26,14 +26,14 @@ namespace System.Buffers
             }
         }
 
-        public static string CopyOutput(this ValueStringBuilder vsb, Span<char> output, bool reverse, bool targetSpan, out int charsWritten)
+        public static string CopyOutput(this ValueStringBuilder vsb, Span<char> destination, bool reverse, bool targetSpan, out int charsWritten)
         {
             if (reverse)
                 vsb.Reverse();
 
             if (targetSpan)
             {
-                vsb.TryCopyTo(output, out charsWritten);
+                vsb.TryCopyTo(destination, out charsWritten);
                 return null;
             }
             else

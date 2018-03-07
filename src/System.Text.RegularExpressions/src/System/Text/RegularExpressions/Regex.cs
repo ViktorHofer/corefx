@@ -261,9 +261,9 @@ namespace System.Text.RegularExpressions
         /// characters as well.)
         /// </summary>
         /// <returns>Returns the amount of chars written into the output Span.</returns>
-        public static int Escape(ReadOnlySpan<char> str, Span<char> output)
+        public static int Escape(ReadOnlySpan<char> str, Span<char> destination)
         {
-            RegexParser.Escape(str, output, true, out int charsWritten);
+            RegexParser.Escape(str, destination, true, out int charsWritten);
 
             return charsWritten;
         }
