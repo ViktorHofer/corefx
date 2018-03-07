@@ -49,7 +49,7 @@ namespace System.Text.RegularExpressions
         internal bool _balancing;        // whether we've done any balancing with this match.  If we have done balancing, 
                                          // we'll need to do extra work in Tidy().
 
-        internal Match(Regex regex, int capcount, MemoryOrPinnedSpan<char> text, int begpos, int len, int startpos)
+        internal Match(Regex regex, int capcount, in MemoryOrPinnedSpan<char> text, int begpos, int len, int startpos)
             : base(text, new int[2], 0, "0")
         {
             Regex = regex;
@@ -81,7 +81,7 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// Resets the Match for reusability.
         /// </summary>
-        internal virtual void Reset(Regex regex, MemoryOrPinnedSpan<char> text, int textbeg, int textend, int textstart)
+        internal virtual void Reset(Regex regex, in MemoryOrPinnedSpan<char> text, int textbeg, int textend, int textstart)
         {
             Regex = regex;
             Text = text;
@@ -423,7 +423,7 @@ namespace System.Text.RegularExpressions
         // the lookup hashtable
         new internal readonly Hashtable _caps;
 
-        internal MatchSparse(Regex regex, Hashtable caps, int capcount, MemoryOrPinnedSpan<char> text, int begpos, int len, int startpos)
+        internal MatchSparse(Regex regex, Hashtable caps, int capcount, in MemoryOrPinnedSpan<char> text, int begpos, int len, int startpos)
             : base(regex, capcount, text, begpos, len, startpos)
         {
             _caps = caps;

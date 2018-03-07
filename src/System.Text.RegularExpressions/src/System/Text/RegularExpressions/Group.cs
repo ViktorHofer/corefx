@@ -23,7 +23,7 @@ namespace System.Text.RegularExpressions
         internal int _capcount;
         internal CaptureCollection _capcoll;
 
-        internal Group(MemoryOrPinnedSpan<char> text, int[] caps, int capcount, string name)
+        internal Group(in MemoryOrPinnedSpan<char> text, int[] caps, int capcount, string name)
             : base(text, capcount == 0 ? 0 : caps[(capcount - 1) * 2],
                capcount == 0 ? 0 : caps[(capcount * 2) - 1])
         {

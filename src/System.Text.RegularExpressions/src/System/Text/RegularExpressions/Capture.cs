@@ -24,7 +24,7 @@ namespace System.Text.RegularExpressions
         /// and the length of the captured string.
         /// </summary>
         /// <param name="text">The input string provided by the user wrapped in a Memory.</param>
-        internal Capture(MemoryOrPinnedSpan<char> text, int index, int length)
+        internal Capture(in MemoryOrPinnedSpan<char> text, int index, int length)
         {
             Text = text;
             Index = index;

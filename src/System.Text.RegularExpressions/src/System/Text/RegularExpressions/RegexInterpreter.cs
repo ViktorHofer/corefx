@@ -88,7 +88,7 @@ namespace System.Text.RegularExpressions
         /// and we could use a separate method Skip() that will quickly scan past
         /// any characters that we know can't match.
         /// </summary>
-        public Match Scan(Regex regex, MemoryOrPinnedSpan<char> mem, ReadOnlySpan<char> input, int textbeg, int textend, int textstart, int prevlen, bool quick, TimeSpan timeout)
+        public Match Scan(Regex regex, in MemoryOrPinnedSpan<char> mem, ReadOnlySpan<char> input, int textbeg, int textend, int textstart, int prevlen, bool quick, TimeSpan timeout)
         {
             _ignoreTimeout = (Regex.InfiniteMatchTimeout == timeout);
             _timeout = _ignoreTimeout

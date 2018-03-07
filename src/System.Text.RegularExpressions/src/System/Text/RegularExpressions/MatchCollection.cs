@@ -34,7 +34,7 @@ namespace System.Text.RegularExpressions
         private int _startat;
         private int _prevlen;
 
-        internal MatchCollection(Regex regex, MemoryOrPinnedSpan<char> input, int beginning, int length, int startat)
+        internal MatchCollection(Regex regex, in MemoryOrPinnedSpan<char> input, int beginning, int length, int startat)
         {
             if (startat < 0 || startat > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);
