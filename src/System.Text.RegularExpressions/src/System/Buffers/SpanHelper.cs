@@ -6,9 +6,9 @@ using System.Text;
 
 namespace System.Buffers
 {
-    internal class SpanHelpers
+    internal static class SpanHelper
     {
-        public static string CopyInput(ReadOnlySpan<char> input, Span<char> output, bool targetSpan, out int charsWritten)
+        public static string CopyInput(this ReadOnlySpan<char> input, Span<char> output, bool targetSpan, out int charsWritten)
         {
             if (targetSpan)
             {
@@ -26,7 +26,7 @@ namespace System.Buffers
             }
         }
 
-        public static string CopyOutput(ValueStringBuilder vsb, Span<char> output, bool reverse, bool targetSpan, out int charsWritten)
+        public static string CopyOutput(this ValueStringBuilder vsb, Span<char> output, bool reverse, bool targetSpan, out int charsWritten)
         {
             if (reverse)
                 vsb.Reverse();

@@ -149,12 +149,12 @@ namespace System.Text.RegularExpressions
                         vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return SpanHelpers.CopyOutput(vsb, output, false, targetSpan, out charsWritten);
+                    return vsb.CopyOutput(output, false, targetSpan, out charsWritten);
                 }
             }
 
             // If nothing to escape, return the input.
-            return SpanHelpers.CopyInput(input, output, targetSpan, out charsWritten);
+            return input.CopyInput(output, targetSpan, out charsWritten);
         }
 
         /*

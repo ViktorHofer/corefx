@@ -196,7 +196,7 @@ namespace System.Text.RegularExpressions
 
             // If count is zero return the input text.
             if (count == 0)
-                return SpanHelpers.CopyInput(input, output, targetSpan, out charsWritten);
+                return input.CopyInput(output, targetSpan, out charsWritten);
 
             // Generate the first Match by using the provided ReadOnlySpan and pass an empty input Memory to it to 
             // avoid the Span to Memory conversion costs (pinning/copying).
@@ -204,7 +204,7 @@ namespace System.Text.RegularExpressions
 
             // If match fails, return the input text.
             if (!match.Success)
-                return SpanHelpers.CopyInput(input, output, targetSpan, out charsWritten);
+                return input.CopyInput(output, targetSpan, out charsWritten);
 
             // Gets the weakly cached replacement helper or creates one if there isn't one already.
             RegexReplacement repl = RegexReplacement.GetOrCreate(ReplRef, replacement, caps, capsize, capnames, roptions);
@@ -260,7 +260,7 @@ namespace System.Text.RegularExpressions
 
             // Return the transformed input text either by writing into the provided output Span or by returning a string, 
             // depending on the targetSpan switch. In right to left mode, do a final reverse of the transformed input.
-            return SpanHelpers.CopyOutput(vsb, output, RightToLeft, targetSpan, out charsWritten);
+            return vsb.CopyOutput(output, RightToLeft, targetSpan, out charsWritten);
         }
 
         /// <summary>
@@ -282,7 +282,7 @@ namespace System.Text.RegularExpressions
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);
 
             if (count == 0)
-                return SpanHelpers.CopyInput(input, output, targetSpan, out charsWritten);
+                return input.CopyInput(output, targetSpan, out charsWritten);
 
             // We need to create a Memory<char> as the match evaluator could access the Value
             // which we usually leave empty during Replace and IsMatch calls to reduce costs.
@@ -294,7 +294,7 @@ namespace System.Text.RegularExpressions
                 Match match = Run(false, -1, mem, input, 0, input.Length, startat);
                 
                 if (!match.Success)
-                    return SpanHelpers.CopyInput(input, output, targetSpan, out charsWritten);
+                    return input.CopyInput(output, targetSpan, out charsWritten);
 
                 Span<char> charInitSpan = stackalloc char[ReplaceBufferSize];
                 var vsb = new ValueStringBuilder(charInitSpan);
@@ -350,7 +350,7 @@ namespace System.Text.RegularExpressions
 
                 // Return the transformed input text either by writing into the provided output Span or by returning a string, 
                 // depending on the targetSpan switch. In right to left mode, do a final reverse of the transformed input.
-                return SpanHelpers.CopyOutput(vsb, output, RightToLeft, targetSpan, out charsWritten);
+                return vsb.CopyOutput(output, RightToLeft, targetSpan, out charsWritten);
             }            
         }
     }

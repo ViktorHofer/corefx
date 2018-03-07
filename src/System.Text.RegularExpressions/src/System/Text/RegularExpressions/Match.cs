@@ -179,7 +179,7 @@ namespace System.Text.RegularExpressions
 
             // Writes the ValueStringBuilder's content either into the output Span or returns 
             // a string dependening on the targetSpan switch.
-            return SpanHelpers.CopyOutput(vsb, output, false, targetSpan, out charsWritten);
+            return vsb.CopyOutput(output, false, targetSpan, out charsWritten);
         }
 
         internal ReadOnlySpan<char> GroupToStringImpl(ReadOnlySpan<char> input, int groupnum)
