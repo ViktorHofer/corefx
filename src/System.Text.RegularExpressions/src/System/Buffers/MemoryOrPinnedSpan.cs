@@ -6,8 +6,8 @@ namespace System.Buffers
 {
     internal unsafe readonly struct MemoryOrPinnedSpan<T>
     {
-        private readonly ReadOnlyMemory<T> _memory;
         public readonly int Length;
+        private readonly ReadOnlyMemory<T> _memory;
         private readonly char* _pinnedSpan;
 
         public MemoryOrPinnedSpan(ReadOnlyMemory<T> memory)

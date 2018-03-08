@@ -178,7 +178,7 @@ namespace System.Text.RegularExpressions
             repl.Replace(Text.Span, ref vsb, this);
 
             // Writes the ValueStringBuilder's content either into the output Span or returns 
-            // a string dependening on the targetSpan switch.
+            // a string depending on the targetSpan switch.
             return vsb.CopyOutput(destination, false, targetSpan, out charsWritten);
         }
 
