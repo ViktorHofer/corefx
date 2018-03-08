@@ -92,13 +92,6 @@ namespace System.Text.RegularExpressions
             return ReplaceImpl(input.AsSpan(), replacement, count, startat, targetSpan: false, Span<char>.Empty, out _);
         }
 
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, string replacement, int count, int startat)
-        {
-            ReplaceImpl(input, replacement, count, startat, targetSpan: true, destination, out int charsWritten);
-
-            return charsWritten;
-        }
-
         /// <summary>
         /// Replaces all occurrences of the <paramref name="pattern"/> with the recent
         /// replacement pattern.
@@ -136,7 +129,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Replace(input, evaluator, -1, UseOptionR() ? input.Length : 0);
+            return ReplaceImpl(input.AsSpan(), evaluator, -1, UseOptionR() ? input.Length : 0, targetSpan : false, Span<char>.Empty, out _);
         }
 
         /// <summary>
@@ -169,13 +162,6 @@ namespace System.Text.RegularExpressions
                 throw new ArgumentNullException(nameof(input));
 
             return ReplaceImpl(input.AsSpan(), evaluator, count, startat, targetSpan: false, Span<char>.Empty, out _);
-        }
-
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, MatchEvaluator evaluator, int count, int startat)
-        {
-            ReplaceImpl(input, evaluator, count, startat, targetSpan: true, destination, out int charsWritten);
-
-            return charsWritten;
         }
 
         /// <summary>
@@ -281,6 +267,7 @@ namespace System.Text.RegularExpressions
             if (startat < 0 || startat > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);
 
+            // If count is zero return the input text.
             if (count == 0)
                 return input.CopyInput(destination, targetSpan, out charsWritten);
 

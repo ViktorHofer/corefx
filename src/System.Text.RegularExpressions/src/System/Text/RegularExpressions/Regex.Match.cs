@@ -86,11 +86,7 @@ namespace System.Text.RegularExpressions
             return IsMatch(input.AsSpan(), startat);
         }
 
-        /// <summary>
-        /// Searches the input Span for one or more matches using the previous pattern and options,
-        /// with a new starting position.
-        /// </summary>
-        public bool IsMatch(ReadOnlySpan<char> input, int startat)
+        private bool IsMatch(ReadOnlySpan<char> input, int startat)
         {
             return (Run(true, -1, MemoryOrPinnedSpan<char>.Empty, input, 0, input.Length, startat) == null);
         }
@@ -169,12 +165,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Match(input.AsMemory(), startat);
-        }
-
-        public Match Match(ReadOnlyMemory<char> input, int startat)
-        {
-            return Match(input, 0, input.Length, startat);
+            return Match(input.AsMemory(), 0, input.Length, startat);
         }
 
         /*
@@ -190,12 +181,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return Match(input.AsMemory(), beginning, length);
-        }
-
-        public Match Match(ReadOnlyMemory<char> input, int beginning, int length)
-        {
-            return Match(input, beginning, length, UseOptionR() ? beginning + length : beginning);
+            return Match(input.AsMemory(), beginning, length, UseOptionR() ? beginning + length : beginning);
         }
 
         private Match Match(ReadOnlyMemory<char> input, int beginning, int length, int startat)
@@ -263,7 +249,7 @@ namespace System.Text.RegularExpressions
             return Matches(input.AsMemory(), startat);
         }
 
-        public MatchCollection Matches(ReadOnlyMemory<char> input, int startat)
+        private MatchCollection Matches(ReadOnlyMemory<char> input, int startat)
         {
             return new MatchCollection(this, new MemoryOrPinnedSpan<char>(input), 0, input.Length, startat);
         }

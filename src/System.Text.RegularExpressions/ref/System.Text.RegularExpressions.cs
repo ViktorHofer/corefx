@@ -168,7 +168,6 @@ namespace System.Text.RegularExpressions
         public bool IsMatch(string input) { throw null; }
         public bool IsMatch(ReadOnlySpan<char> input) { throw null; }
         public bool IsMatch(string input, int startat) { throw null; }
-        public bool IsMatch(ReadOnlySpan<char> input, int startat) { throw null; }
         public static bool IsMatch(string input, string pattern) { throw null; }
         public static bool IsMatch(string input, string pattern, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static bool IsMatch(string input, string pattern, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
@@ -176,9 +175,7 @@ namespace System.Text.RegularExpressions
         public System.Text.RegularExpressions.Match Match(string input) { throw null; }
         public System.Text.RegularExpressions.Match Match(ReadOnlyMemory<char> input) { throw null; }
         public System.Text.RegularExpressions.Match Match(string input, int startat) { throw null; }
-        public System.Text.RegularExpressions.Match Match(ReadOnlyMemory<char> input, int startat) { throw null; }
         public System.Text.RegularExpressions.Match Match(string input, int beginning, int length) { throw null; }
-        public System.Text.RegularExpressions.Match Match(ReadOnlyMemory<char> input, int beginning, int length) { throw null; }
         public static System.Text.RegularExpressions.Match Match(string input, string pattern) { throw null; }
         public static System.Text.RegularExpressions.Match Match(string input, string pattern, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static System.Text.RegularExpressions.Match Match(string input, string pattern, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
@@ -186,7 +183,6 @@ namespace System.Text.RegularExpressions
         public System.Text.RegularExpressions.MatchCollection Matches(string input) { throw null; }
         public System.Text.RegularExpressions.MatchCollection Matches(ReadOnlyMemory<char> input) { throw null; }
         public System.Text.RegularExpressions.MatchCollection Matches(string input, int startat) { throw null; }
-        public System.Text.RegularExpressions.MatchCollection Matches(ReadOnlyMemory<char> input, int startat) { throw null; }
         public static System.Text.RegularExpressions.MatchCollection Matches(string input, string pattern) { throw null; }
         public static System.Text.RegularExpressions.MatchCollection Matches(string input, string pattern, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static System.Text.RegularExpressions.MatchCollection Matches(string input, string pattern, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
@@ -195,7 +191,6 @@ namespace System.Text.RegularExpressions
         public string Replace(string input, string replacement, int count) { throw null; }
         public int Replace(ReadOnlySpan<char> input, Span<char> destination, string replacement, int count = -1) { throw null; }
         public string Replace(string input, string replacement, int count, int startat) { throw null; }
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, string replacement, int count, int startat) { throw null; }
         public static string Replace(string input, string pattern, string replacement) { throw null; }
         public static string Replace(string input, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static string Replace(string input, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
@@ -208,7 +203,6 @@ namespace System.Text.RegularExpressions
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator, int count) { throw null; }
         public int Replace(ReadOnlySpan<char> input, Span<char> destination, System.Text.RegularExpressions.MatchEvaluator evaluator, int count = -1) { throw null; }
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator, int count, int startat) { throw null; }
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, System.Text.RegularExpressions.MatchEvaluator evaluator, int count, int startat) { throw null; }
         public string[] Split(string input) { throw null; }
         public string[] Split(string input, int count) { throw null; }
         public string[] Split(string input, int count, int startat) { throw null; }
