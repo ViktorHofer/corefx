@@ -21,8 +21,8 @@ namespace System.Text.RegularExpressions.Tests
 
             // Use Escape(ReadOnlySpan, Span)
             Span<char> output = stackalloc char[255];
-            int charsWritten = Regex.Escape(str.AsSpan(), output);
-            SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+            bool success = Regex.TryEscape(str.AsSpan(), output, out int charsWritten);
+            SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
         }
 
         [Fact]
@@ -44,8 +44,8 @@ namespace System.Text.RegularExpressions.Tests
 
             // Use Escape(ReadOnlySpan, Span)
             Span<char> output = stackalloc char[255];
-            int charsWritten = Regex.Unescape(str.AsSpan(), output);
-            SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+            bool success = Regex.TryUnescape(str.AsSpan(), output, out int charsWritten);
+            SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
         }
 
         [Fact]

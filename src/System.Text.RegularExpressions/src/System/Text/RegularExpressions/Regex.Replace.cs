@@ -41,9 +41,9 @@ namespace System.Text.RegularExpressions
             return new Regex(pattern, options, matchTimeout, true).Replace(input, replacement);
         }
 
-        public static int Replace(ReadOnlySpan<char> input, Span<char> destination, string pattern, string replacement, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
+        public static bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string pattern, string replacement, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
         {
-            return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).Replace(input, destination, replacement);
+            return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).TryReplace(input, destination, out charsWritten, replacement);
         }
 
         /// <summary>
@@ -56,7 +56,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return ReplaceImpl(input.AsSpan(), replacement, -1, UseOptionR() ? input.Length : 0, targetSpan: false, Span<char>.Empty, out _);
+            return ReplaceImpl(targetSpan: false, input.AsSpan(), Span<char>.Empty, out _, out _, replacement, -1, UseOptionR() ? input.Length : 0);
         }
 
         /// <summary>
@@ -69,14 +69,14 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return ReplaceImpl(input.AsSpan(), replacement, count, UseOptionR() ? input.Length : 0, targetSpan: false, Span<char>.Empty, out _).ToString();
+            return ReplaceImpl(targetSpan: false, input.AsSpan(), Span<char>.Empty, out _, out _, replacement, count, UseOptionR() ? input.Length : 0);
         }
 
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, string replacement, int count = -1)
+        public bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string replacement, int count = -1)
         {
-            ReplaceImpl(input, replacement, count, UseOptionR() ? input.Length : 0, targetSpan: true, destination, out int charsWritten);
+            ReplaceImpl(targetSpan: true, input, destination, out charsWritten, out bool spanSuccess, replacement, count, UseOptionR() ? input.Length : 0);
 
-            return charsWritten;
+            return spanSuccess;
         }
 
         /// <summary>
@@ -89,7 +89,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return ReplaceImpl(input.AsSpan(), replacement, count, startat, targetSpan: false, Span<char>.Empty, out _);
+            return ReplaceImpl(targetSpan: false, input.AsSpan(), Span<char>.Empty, out _, out _, replacement, count, startat);
         }
 
         /// <summary>
@@ -115,9 +115,9 @@ namespace System.Text.RegularExpressions
             return new Regex(pattern, options, matchTimeout, true).Replace(input, evaluator);
         }
 
-        public static int Replace(ReadOnlySpan<char> input, Span<char> destination, string pattern, MatchEvaluator evaluator, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
+        public static bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string pattern, MatchEvaluator evaluator, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
         {
-            return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).Replace(input, destination, evaluator);
+            return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).TryReplace(input, destination, out charsWritten, evaluator);
         }
 
         /// <summary>
@@ -129,7 +129,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return ReplaceImpl(input.AsSpan(), evaluator, -1, UseOptionR() ? input.Length : 0, targetSpan : false, Span<char>.Empty, out _);
+            return ReplaceImpl(targetSpan: false, input.AsSpan(), Span<char>.Empty, out _, out _, evaluator, -1, UseOptionR() ? input.Length : 0);
         }
 
         /// <summary>
@@ -141,14 +141,14 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return ReplaceImpl(input.AsSpan(), evaluator, count, UseOptionR() ? input.Length : 0, targetSpan: false, Span<char>.Empty, out _);
+            return ReplaceImpl(targetSpan: false, input.AsSpan(), Span<char>.Empty, out _, out _, evaluator, count, UseOptionR() ? input.Length : 0);
         }
 
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, MatchEvaluator evaluator, int count = -1)
+        public bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, MatchEvaluator evaluator, int count = -1)
         {
-            ReplaceImpl(input, evaluator, count, UseOptionR() ? input.Length : 0, targetSpan: true, destination, out int charsWritten);
+            ReplaceImpl(targetSpan: true, input, destination, out charsWritten, out bool spanSuccess, evaluator, count, UseOptionR() ? input.Length : 0);
 
-            return charsWritten;
+            return spanSuccess;
         }
 
         /// <summary>
@@ -161,7 +161,7 @@ namespace System.Text.RegularExpressions
             if (input == null)
                 throw new ArgumentNullException(nameof(input));
 
-            return ReplaceImpl(input.AsSpan(), evaluator, count, startat, targetSpan: false, Span<char>.Empty, out _);
+            return ReplaceImpl(targetSpan: false, input.AsSpan(), Span<char>.Empty, out _, out _, evaluator, count, startat);
         }
 
         /// <summary>
@@ -171,7 +171,7 @@ namespace System.Text.RegularExpressions
         /// Note that the special case of no matches is handled on its own:
         /// with no matches, the input text is returned unchanged.
         /// </summary>
-        private string ReplaceImpl(ReadOnlySpan<char> input, string replacement, int count, int startat, bool targetSpan, Span<char> destination, out int charsWritten)
+        private string ReplaceImpl(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess, string replacement, int count, int startat)
         {
             if (replacement == null)
                 throw new ArgumentNullException(nameof(replacement));
@@ -182,7 +182,7 @@ namespace System.Text.RegularExpressions
 
             // If count is zero return the input text.
             if (count == 0)
-                return input.CopyInput(destination, targetSpan, out charsWritten);
+                return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
 
             // Generate the first Match by using the provided ReadOnlySpan and pass an empty input Memory to it to 
             // avoid the Span to Memory conversion costs (pinning/copying).
@@ -190,7 +190,7 @@ namespace System.Text.RegularExpressions
 
             // If match fails, return the input text.
             if (!match.Success)
-                return input.CopyInput(destination, targetSpan, out charsWritten);
+                return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
 
             // Gets the weakly cached replacement helper or creates one if there isn't one already.
             RegexReplacement repl = RegexReplacement.GetOrCreate(ReplRef, replacement, caps, capsize, capnames, roptions);
@@ -246,7 +246,7 @@ namespace System.Text.RegularExpressions
 
             // Return the transformed input text either by writing into the provided output Span or by returning a string, 
             // depending on the targetSpan switch. In right to left mode, do a final reverse of the transformed input.
-            return vsb.CopyOutput(destination, RightToLeft, targetSpan, out charsWritten);
+            return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, RightToLeft);
         }
 
         /// <summary>
@@ -258,7 +258,7 @@ namespace System.Text.RegularExpressions
         /// The right-to-left case is split out because StringBuilder
         /// doesn't handle right-to-left string building directly very well.
         /// </summary>
-        private unsafe string ReplaceImpl(ReadOnlySpan<char> input, MatchEvaluator evaluator, int count, int startat, bool targetSpan, Span<char> destination, out int charsWritten)
+        private unsafe string ReplaceImpl(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess, MatchEvaluator evaluator, int count, int startat)
         {
             if (evaluator == null)
                 throw new ArgumentNullException(nameof(evaluator));
@@ -269,7 +269,7 @@ namespace System.Text.RegularExpressions
 
             // If count is zero return the input text.
             if (count == 0)
-                return input.CopyInput(destination, targetSpan, out charsWritten);
+                return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
 
             // We need to create a Memory<char> as the match evaluator could access the Value
             // which we usually leave empty during Replace and IsMatch calls to reduce costs.
@@ -281,7 +281,7 @@ namespace System.Text.RegularExpressions
                 Match match = Run(false, -1, mem, input, 0, input.Length, startat);
                 
                 if (!match.Success)
-                    return input.CopyInput(destination, targetSpan, out charsWritten);
+                    return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
 
                 Span<char> charInitSpan = stackalloc char[ReplaceBufferSize];
                 var vsb = new ValueStringBuilder(charInitSpan);
@@ -337,7 +337,7 @@ namespace System.Text.RegularExpressions
 
                 // Return the transformed input text either by writing into the provided output Span or by returning a string, 
                 // depending on the targetSpan switch. In right to left mode, do a final reverse of the transformed input.
-                return vsb.CopyOutput(destination, RightToLeft, targetSpan, out charsWritten);
+                return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, RightToLeft);
             }            
         }
     }

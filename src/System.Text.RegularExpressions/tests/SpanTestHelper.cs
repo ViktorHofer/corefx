@@ -8,8 +8,9 @@ namespace System.Text.RegularExpressions.Tests
 {
     internal static class SpanTestHelpers
     {
-        public static void VerifySpan(string expected, int charsWritten, Span<char> output)
+        public static void VerifySpan(string expected, Span<char> output, int charsWritten, bool success)
         {
+            Assert.True(success);
             Assert.Equal(expected.Length, charsWritten);
             Assert.Equal(expected, output.Slice(0, charsWritten).ToString());
         }

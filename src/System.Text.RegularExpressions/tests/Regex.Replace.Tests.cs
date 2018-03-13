@@ -117,49 +117,50 @@ namespace System.Text.RegularExpressions.Tests
             bool isDefaultCount = RegexHelpers.IsDefaultCount(input, options, count);
             Span<char> output = stackalloc char[1000]; // largest input is 1000 chars long.
             int charsWritten = 0;
+            bool success = false;
 
             if (options == RegexOptions.None)
             {
                 if (isDefaultStart && isDefaultCount)
                 {
-                    // Use Replace(string, string) & Replace(Span, Span, string)
+                    // Use Replace(string, string) & TryReplace(Span, Span, string)
                     Assert.Equal(expected, new Regex(pattern).Replace(input, replacement));
-                    charsWritten = new Regex(pattern).Replace(input.AsSpan(), output, replacement);
-                    SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                    success = new Regex(pattern).TryReplace(input.AsSpan(), output, out charsWritten, replacement);
+                    SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
 
-                    // Use Replace(string, string, string) & Replace(Span, Span, string, string)
+                    // Use Replace(string, string, string) & TryReplace(Span, Span, string, string)
                     Assert.Equal(expected, Regex.Replace(input, pattern, replacement));
-                    charsWritten = Regex.Replace(input.AsSpan(), output, pattern, replacement);
-                    SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                    success = Regex.TryReplace(input.AsSpan(), output, out charsWritten, pattern, replacement);
+                    SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
                 }
                 if (isDefaultStart)
                 {
-                    // Use Replace(string, string, string, int) & Replace(Span, Span, string, string, int)
+                    // Use Replace(string, string, string, int) & TryReplace(Span, Span, string, string, int)
                     Assert.Equal(expected, new Regex(pattern).Replace(input, replacement, count));
-                    charsWritten = new Regex(pattern).Replace(input.AsSpan(), output, replacement, count);
-                    SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                    success = new Regex(pattern).TryReplace(input.AsSpan(), output, out charsWritten, replacement, count);
+                    SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
                 }
                 // Use Replace(string, string, int, int)
                 Assert.Equal(expected, new Regex(pattern).Replace(input, replacement, count, start));
             }
             if (isDefaultStart && isDefaultCount)
             {
-                // Use Replace(string, string) & Replace(Span, Span, string)
+                // Use Replace(string, string) & TryReplace(Span, Span, string)
                 Assert.Equal(expected, new Regex(pattern, options).Replace(input, replacement));
-                charsWritten = new Regex(pattern, options).Replace(input.AsSpan(), output, replacement);
-                SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                success = new Regex(pattern, options).TryReplace(input.AsSpan(), output, out charsWritten, replacement);
+                SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
 
-                // Use Replace(string, string, string, RegexOptions) & Replace(Span, Span, string, string, RegexOptions)
+                // Use Replace(string, string, string, RegexOptions) & TryReplace(Span, Span, string, string, RegexOptions)
                 Assert.Equal(expected, Regex.Replace(input, pattern, replacement, options));
-                charsWritten = Regex.Replace(input.AsSpan(), output, pattern, replacement, options);
-                SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                success = Regex.TryReplace(input.AsSpan(), output, out charsWritten, pattern, replacement, options);
+                SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
             }
             if (isDefaultStart)
             {
                 // Use Replace(string, string, string, int) & Replace(Span, Span, string, string, int)
                 Assert.Equal(expected, new Regex(pattern, options).Replace(input, replacement, count));
-                charsWritten = new Regex(pattern, options).Replace(input.AsSpan(), output, replacement, count);
-                SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                success = new Regex(pattern, options).TryReplace(input.AsSpan(), output, out charsWritten, replacement, count);
+                SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
             }
             // Use Replace(string, string, int, int)
             Assert.Equal(expected, new Regex(pattern, options).Replace(input, replacement, count, start));
@@ -206,27 +207,28 @@ namespace System.Text.RegularExpressions.Tests
             bool isDefaultCount = RegexHelpers.IsDefaultCount(input, options, count);
             Span<char> output = stackalloc char[255];
             int charsWritten = 0;
+            bool success = false;
 
             if (options == RegexOptions.None)
             {
                 if (isDefaultStart && isDefaultCount)
                 {
-                    // Use Replace(string, MatchEvaluator) & Replace(Span, Span, MatchEvaluator) 
+                    // Use Replace(string, MatchEvaluator) & TryReplace(Span, Span, MatchEvaluator) 
                     Assert.Equal(expected, new Regex(pattern).Replace(input, evaluator));
-                    charsWritten = new Regex(pattern).Replace(input.AsSpan(), output, evaluator);
-                    SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                    success = new Regex(pattern).TryReplace(input.AsSpan(), output, out charsWritten, evaluator);
+                    SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
 
-                    // Use Replace(string, string, MatchEvaluator) & Replace(Span, Span, string, MatchEvaluator)
+                    // Use Replace(string, string, MatchEvaluator) & TryReplace(Span, Span, string, MatchEvaluator)
                     Assert.Equal(expected, Regex.Replace(input, pattern, evaluator));
-                    charsWritten = Regex.Replace(input.AsSpan(), output, pattern, evaluator);
-                    SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                    success = Regex.TryReplace(input.AsSpan(), output, out charsWritten, pattern, evaluator);
+                    SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
                 }
                 if (isDefaultStart)
                 {
-                    // Use Replace(string, MatchEvaluator, string, int) & Replace(Span, MatchEvaluator, string, int)
+                    // Use Replace(string, MatchEvaluator, string, int) & TryReplace(Span, MatchEvaluator, string, int)
                     Assert.Equal(expected, new Regex(pattern).Replace(input, evaluator, count));
-                    charsWritten = new Regex(pattern).Replace(input.AsSpan(), output, evaluator, count);
-                    SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                    success = new Regex(pattern).TryReplace(input.AsSpan(), output, out charsWritten, evaluator, count);
+                    SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
                 }
 
                 // Use Replace(string, MatchEvaluator, int, int)
@@ -234,22 +236,22 @@ namespace System.Text.RegularExpressions.Tests
             }
             if (isDefaultStart && isDefaultCount)
             {
-                // Use Replace(string, MatchEvaluator) & Replace(Span, Span, MatchEvaluator)
+                // Use Replace(string, MatchEvaluator) & TryReplace(Span, Span, MatchEvaluator)
                 Assert.Equal(expected, new Regex(pattern, options).Replace(input, evaluator));
-                charsWritten = new Regex(pattern, options).Replace(input.AsSpan(), output, evaluator);
-                SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                success = new Regex(pattern, options).TryReplace(input.AsSpan(), output, out charsWritten, evaluator);
+                SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
 
-                // Use Replace(string, MatchEvaluator, RegexOptions) & Replace(Span, Span, MatchEvaluator, RegexOptions)
+                // Use Replace(string, MatchEvaluator, RegexOptions) & TryReplace(Span, Span, MatchEvaluator, RegexOptions)
                 Assert.Equal(expected, Regex.Replace(input, pattern, evaluator, options));
-                charsWritten = Regex.Replace(input.AsSpan(), output, pattern, evaluator, options);
-                SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                success = Regex.TryReplace(input.AsSpan(), output, out charsWritten, pattern, evaluator, options);
+                SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
             }
             if (isDefaultStart)
             {
-                // Use Replace(string, MatchEvaluator, string, int) & Replace(Span, Span, MatchEvaluator, string, int)
+                // Use Replace(string, MatchEvaluator, string, int) & TryReplace(Span, Span, MatchEvaluator, string, int)
                 Assert.Equal(expected, new Regex(pattern, options).Replace(input, evaluator, count));
-                charsWritten = new Regex(pattern, options).Replace(input.AsSpan(), output, evaluator, count);
-                SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+                success = new Regex(pattern, options).TryReplace(input.AsSpan(), output, out charsWritten, evaluator, count);
+                SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
             }
             // Use Replace(string, MatchEvaluator, int, int)
             Assert.Equal(expected, new Regex(pattern, options).Replace(input, evaluator, count, start));
@@ -260,17 +262,16 @@ namespace System.Text.RegularExpressions.Tests
         {
             string expected = "";
             Span<char> output = stackalloc char[255];
-            int charsWritten = 0;
 
-            // Use Replace(string, string, string) & Replace(Span, string, string)
+            // Use Replace(string, string, string) & TryReplace(Span, string, string)
             Assert.Same(expected, Regex.Replace(expected, "no-match", "replacement"));
-            charsWritten = Regex.Replace(expected.AsSpan(), output, "no-match", "replacement");
-            SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+            bool success = Regex.TryReplace(expected.AsSpan(), output, out int charsWritten, "no-match", "replacement");
+            SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
 
-            // Use Replace(string, string, MatchEvaluator) & Replace(Span, string, MatchEvaluator)
+            // Use Replace(string, string, MatchEvaluator) & TryReplace(Span, string, MatchEvaluator)
             Assert.Same(expected, Regex.Replace(expected, "no-match", new MatchEvaluator(MatchEvaluator1)));
-            charsWritten = Regex.Replace(expected.AsSpan(), output, "no-match", new MatchEvaluator(MatchEvaluator1));
-            SpanTestHelpers.VerifySpan(expected, charsWritten, output);
+            success = Regex.TryReplace(expected.AsSpan(), output, out charsWritten, "no-match", new MatchEvaluator(MatchEvaluator1));
+            SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
         }
 
         [Fact]
@@ -295,39 +296,39 @@ namespace System.Text.RegularExpressions.Tests
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input", null, "replacement"));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input", null, "replacement", RegexOptions.None));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input", null, "replacement", RegexOptions.None, TimeSpan.FromMilliseconds(1)));
-            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input".AsSpan(), default, null, "replacement", RegexOptions.None, TimeSpan.FromMilliseconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.TryReplace("input".AsSpan(), default, out _, null, "replacement", RegexOptions.None, TimeSpan.FromMilliseconds(1)));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input", null, new MatchEvaluator(MatchEvaluator1)));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input", null, new MatchEvaluator(MatchEvaluator1), RegexOptions.None));
             AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input", null, new MatchEvaluator(MatchEvaluator1), RegexOptions.None, TimeSpan.FromMilliseconds(1)));
-            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.Replace("input".AsSpan(), default, null, new MatchEvaluator(MatchEvaluator1), RegexOptions.None, TimeSpan.FromMilliseconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("pattern", () => Regex.TryReplace("input".AsSpan(), default, out _, null, new MatchEvaluator(MatchEvaluator1), RegexOptions.None, TimeSpan.FromMilliseconds(1)));
 
             // Replacement is null
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => Regex.Replace("input", "pattern", (string)null));
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => Regex.Replace("input", "pattern", (string)null, RegexOptions.None));
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => Regex.Replace("input", "pattern", (string)null, RegexOptions.None, TimeSpan.FromMilliseconds(1)));
-            AssertExtensions.Throws<ArgumentNullException>("replacement", () => Regex.Replace("input".AsSpan(), default, "pattern", (string)null, RegexOptions.None, TimeSpan.FromMilliseconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("replacement", () => Regex.TryReplace("input".AsSpan(), default, out _, "pattern", (string)null, RegexOptions.None, TimeSpan.FromMilliseconds(1)));
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => new Regex("pattern").Replace("input", (string)null));
-            AssertExtensions.Throws<ArgumentNullException>("replacement", () => new Regex("pattern").Replace("input".AsSpan(), default, (string)null));
+            AssertExtensions.Throws<ArgumentNullException>("replacement", () => new Regex("pattern").TryReplace("input".AsSpan(), default, out _, (string)null));
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => new Regex("pattern").Replace("input", (string)null, 0));
-            AssertExtensions.Throws<ArgumentNullException>("replacement", () => new Regex("pattern").Replace("input".AsSpan(), default, (string)null, 0));
+            AssertExtensions.Throws<ArgumentNullException>("replacement", () => new Regex("pattern").TryReplace("input".AsSpan(), default, out _, (string)null, 0));
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => new Regex("pattern").Replace("input", (string)null, 0, 0));
 
             AssertExtensions.Throws<ArgumentNullException>("evaluator", () => Regex.Replace("input", "pattern", (MatchEvaluator)null));
             AssertExtensions.Throws<ArgumentNullException>("evaluator", () => Regex.Replace("input", "pattern", (MatchEvaluator)null, RegexOptions.None));
             AssertExtensions.Throws<ArgumentNullException>("evaluator", () => Regex.Replace("input", "pattern", (MatchEvaluator)null, RegexOptions.None, TimeSpan.FromMilliseconds(1)));
-            AssertExtensions.Throws<ArgumentNullException>("evaluator", () => Regex.Replace("input".AsSpan(), default, "pattern", (MatchEvaluator)null, RegexOptions.None, TimeSpan.FromMilliseconds(1)));
+            AssertExtensions.Throws<ArgumentNullException>("evaluator", () => Regex.TryReplace("input".AsSpan(), default, out _, "pattern", (MatchEvaluator)null, RegexOptions.None, TimeSpan.FromMilliseconds(1)));
             AssertExtensions.Throws<ArgumentNullException>("evaluator", () => new Regex("pattern").Replace("input", (MatchEvaluator)null));
-            AssertExtensions.Throws<ArgumentNullException>("evaluator", () => new Regex("pattern").Replace("input".AsSpan(), default, (MatchEvaluator)null));
+            AssertExtensions.Throws<ArgumentNullException>("evaluator", () => new Regex("pattern").TryReplace("input".AsSpan(), default, out _, (MatchEvaluator)null));
             AssertExtensions.Throws<ArgumentNullException>("evaluator", () => new Regex("pattern").Replace("input", (MatchEvaluator)null, 0));
-            AssertExtensions.Throws<ArgumentNullException>("evaluator", () => new Regex("pattern").Replace("input".AsSpan(), default, (MatchEvaluator)null, 0));
+            AssertExtensions.Throws<ArgumentNullException>("evaluator", () => new Regex("pattern").TryReplace("input".AsSpan(), default, out _, (MatchEvaluator)null, 0));
             AssertExtensions.Throws<ArgumentNullException>("evaluator", () => new Regex("pattern").Replace("input", (MatchEvaluator)null, 0, 0));
 
             // Count is invalid
             AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").Replace("input", "replacement", -2));
-            AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").Replace("input".AsSpan(), default, "replacement", -2));
+            AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").TryReplace("input".AsSpan(), default, out _, "replacement", -2));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").Replace("input", "replacement", -2, 0));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").Replace("input", new MatchEvaluator(MatchEvaluator1), -2));
-            AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").Replace("input".AsSpan(), default, new MatchEvaluator(MatchEvaluator1), -2));
+            AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").TryReplace("input".AsSpan(), default, out _, new MatchEvaluator(MatchEvaluator1), -2));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("count", () => new Regex("pattern").Replace("input", new MatchEvaluator(MatchEvaluator1), -2, 0));
 
             // Start is invalid

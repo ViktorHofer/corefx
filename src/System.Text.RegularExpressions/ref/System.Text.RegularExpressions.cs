@@ -100,7 +100,7 @@ namespace System.Text.RegularExpressions
         public virtual System.Text.RegularExpressions.GroupCollection Groups { get { throw null; } }
         public System.Text.RegularExpressions.Match NextMatch() { throw null; }
         public virtual string Result(string replacement) { throw null; }
-        public virtual int Result(string replacement, Span<char> destination) { throw null; }
+        public virtual bool TryResult(string replacement, Span<char> destination, out int charsWritten) { throw null; }
         public static System.Text.RegularExpressions.Match Synchronized(System.Text.RegularExpressions.Match inner) { throw null; }
     }
     public partial class MatchCollection : System.Collections.Generic.ICollection<System.Text.RegularExpressions.Match>, System.Collections.Generic.IEnumerable<System.Text.RegularExpressions.Match>, System.Collections.Generic.IList<System.Text.RegularExpressions.Match>, System.Collections.Generic.IReadOnlyCollection<System.Text.RegularExpressions.Match>, System.Collections.Generic.IReadOnlyList<System.Text.RegularExpressions.Match>, System.Collections.ICollection, System.Collections.IEnumerable, System.Collections.IList
@@ -159,7 +159,7 @@ namespace System.Text.RegularExpressions
         public System.Text.RegularExpressions.RegexOptions Options { get { throw null; } }
         public bool RightToLeft { get { throw null; } }
         public static string Escape(string str) { throw null; }
-        public static int Escape(ReadOnlySpan<char> str, Span<char> destination) { throw null; }
+        public static bool TryEscape(ReadOnlySpan<char> str, Span<char> destination, out int charsWritten) { throw null; }
         public string[] GetGroupNames() { throw null; }
         public int[] GetGroupNumbers() { throw null; }
         public string GroupNameFromNumber(int i) { throw null; }
@@ -189,19 +189,19 @@ namespace System.Text.RegularExpressions
         public static System.Text.RegularExpressions.MatchCollection Matches(ReadOnlyMemory<char> input, string pattern, System.Text.RegularExpressions.RegexOptions options = RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
         public string Replace(string input, string replacement) { throw null; }
         public string Replace(string input, string replacement, int count) { throw null; }
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, string replacement, int count = -1) { throw null; }
+        public bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string replacement, int count = -1) { throw null; }
         public string Replace(string input, string replacement, int count, int startat) { throw null; }
         public static string Replace(string input, string pattern, string replacement) { throw null; }
         public static string Replace(string input, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static string Replace(string input, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
-        public static int Replace(ReadOnlySpan<char> input, Span<char> destination, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
+        public static bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
         public static string Replace(string input, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator) { throw null; }
         public static string Replace(string input, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static string Replace(string input, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
-        public static int Replace(ReadOnlySpan<char> input, Span<char> destination, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
+        public static bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator) { throw null; }
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator, int count) { throw null; }
-        public int Replace(ReadOnlySpan<char> input, Span<char> destination, System.Text.RegularExpressions.MatchEvaluator evaluator, int count = -1) { throw null; }
+        public bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, System.Text.RegularExpressions.MatchEvaluator evaluator, int count = -1) { throw null; }
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator, int count, int startat) { throw null; }
         public string[] Split(string input) { throw null; }
         public string[] Split(string input, int count) { throw null; }
@@ -212,7 +212,7 @@ namespace System.Text.RegularExpressions
         void System.Runtime.Serialization.ISerializable.GetObjectData(System.Runtime.Serialization.SerializationInfo si, System.Runtime.Serialization.StreamingContext context) { }
         public override string ToString() { throw null; }
         public static string Unescape(string str) { throw null; }
-        public static int Unescape(ReadOnlySpan<char> str, Span<char> destination) { throw null; }
+        public static bool TryUnescape(ReadOnlySpan<char> str, Span<char> destination, out int charsWritten) { throw null; }
         protected bool UseOptionC() { throw null; }
         protected bool UseOptionR() { throw null; }
         protected internal static void ValidateMatchTimeout(System.TimeSpan matchTimeout) { }

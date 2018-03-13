@@ -248,7 +248,7 @@ namespace System.Text.RegularExpressions
             if (str == null)
                 throw new ArgumentNullException(nameof(str));
 
-            return RegexParser.Escape(str.AsSpan(), Span<char>.Empty, false, out _);
+            return RegexParser.Escape(targetSpan: false, str.AsSpan(), Span<char>.Empty, out _, out _);
         }
 
         /// <summary>
@@ -261,11 +261,11 @@ namespace System.Text.RegularExpressions
         /// characters as well.)
         /// </summary>
         /// <returns>Returns the amount of chars written into the output Span.</returns>
-        public static int Escape(ReadOnlySpan<char> str, Span<char> destination)
+        public static bool TryEscape(ReadOnlySpan<char> str, Span<char> destination, out int charsWritten)
         {
-            RegexParser.Escape(str, destination, true, out int charsWritten);
+            RegexParser.Escape(targetSpan: true, str, destination, out charsWritten, out bool spanSuccess);
 
-            return charsWritten;
+            return spanSuccess;
         }
 
         /// <summary>
@@ -276,17 +276,17 @@ namespace System.Text.RegularExpressions
             if (str == null)
                 throw new ArgumentNullException(nameof(str));
 
-            return RegexParser.Unescape(str.AsSpan(), Span<char>.Empty, false, out _);
+            return RegexParser.Unescape(targetSpan: false, str.AsSpan(), Span<char>.Empty, out _, out _);
         }
 
         /// <summary>
         /// Unescapes any escaped characters in the input text.
         /// </summary>
-        public static int Unescape(ReadOnlySpan<char> str, Span<char> destination)
+        public static bool TryUnescape(ReadOnlySpan<char> str, Span<char> destination, out int charsWritten)
         {
-            RegexParser.Unescape(str, destination, true, out int charsWritten);
+            RegexParser.Unescape(targetSpan: true, str, destination, out charsWritten, out bool spanSuccess);
 
-            return charsWritten;
+            return spanSuccess;
         }
 
         /// <summary>

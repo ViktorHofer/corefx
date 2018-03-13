@@ -766,10 +766,8 @@ namespace System.Text.RegularExpressions.Tests
 
             // Use Match.Result(string, Span)
             Span<char> output = stackalloc char[255];
-            int charsWritten = new Regex(pattern).Match(input.AsMemory()).Result(replacement, output);
-
-            Assert.Equal(expected.Length, charsWritten);
-            Assert.Equal(expected, output.Slice(0, charsWritten).ToString());
+            bool success = new Regex(pattern).Match(input.AsMemory()).TryResult(replacement, output, out int charsWritten);
+            SpanTestHelpers.VerifySpan(expected, output, charsWritten, success);
         }
 
         [Fact]
@@ -777,10 +775,10 @@ namespace System.Text.RegularExpressions.Tests
         {
             Match match = Regex.Match("foo", "foo");
             AssertExtensions.Throws<ArgumentNullException>("replacement", () => match.Result(null));
-            AssertExtensions.Throws<ArgumentNullException>("replacement", () => match.Result(null, default));
+            AssertExtensions.Throws<ArgumentNullException>("replacement", () => match.TryResult(null, default, out _));
 
             Assert.Throws<NotSupportedException>(() => RegularExpressions.Match.Empty.Result("any"));
-            Assert.Throws<NotSupportedException>(() => RegularExpressions.Match.Empty.Result("any", default));
+            Assert.Throws<NotSupportedException>(() => RegularExpressions.Match.Empty.TryResult("any", default, out _));
         }
 
         [Fact]

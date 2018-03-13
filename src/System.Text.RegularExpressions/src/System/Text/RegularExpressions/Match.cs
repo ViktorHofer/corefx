@@ -143,7 +143,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public virtual string Result(string replacement)
         {
-            return ResultImpl(replacement, Span<char>.Empty, targetSpan: false, out _);
+            return ResultImpl(targetSpan: false, replacement, Span<char>.Empty, out _, out _);
         }
 
         /// <summary>
@@ -152,17 +152,17 @@ namespace System.Text.RegularExpressions
         /// of the Group(1) and Group(2)'s captured text. 
         /// </summary>
         /// <returns>Returns the amount of chars written into the output Span.</returns>
-        public virtual int Result(string replacement, Span<char> destination)
+        public virtual bool TryResult(string replacement, Span<char> destination, out int charsWritten)
         {
-            ResultImpl(replacement, destination, targetSpan: true, out int charsWritten);
+            ResultImpl(targetSpan: true, replacement, destination, out charsWritten, out bool spanSuccess);
 
-            return charsWritten;
+            return spanSuccess;
         }
 
         /// <summary>
         /// Returns the replacement result for a single match. Works with both Spans and strings.
         /// </summary>
-        private string ResultImpl(string replacement, Span<char> destination, bool targetSpan, out int charsWritten)
+        private string ResultImpl(bool targetSpan, string replacement, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             if (replacement == null)
                 throw new ArgumentNullException(nameof(replacement));
@@ -179,7 +179,7 @@ namespace System.Text.RegularExpressions
 
             // Writes the ValueStringBuilder's content either into the output Span or returns 
             // a string depending on the targetSpan switch.
-            return vsb.CopyOutput(destination, false, targetSpan, out charsWritten);
+            return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, reverse: false);
         }
 
         internal ReadOnlySpan<char> GroupToStringImpl(ReadOnlySpan<char> input, int groupnum)
