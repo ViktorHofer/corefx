@@ -160,36 +160,39 @@ namespace System.Text.RegularExpressions
         /*
          * Escapes all metacharacters (including (,),[,],{,},|,^,$,*,+,?,\, spaces and #)
          */
-        public static string Unescape(string input)
+        public static string Unescape(ReadOnlySpan<char> input, Span<char> destination, bool targetSpan, out int charsWritten)
         {
             for (int i = 0; i < input.Length; i++)
             {
                 if (input[i] == '\\')
                 {
-                    StringBuilder sb = StringBuilderCache.Acquire();
                     RegexParser p = new RegexParser(CultureInfo.InvariantCulture);
-                    int lastpos;
-                    p.SetPattern(input);
+                    p.SetPattern(input.ToString());
 
-                    sb.Append(input, 0, i);
+                    Span<char> charInitSpan = stackalloc char[256];
+                    var vsb = new ValueStringBuilder(charInitSpan);
+
+                    vsb.Append(input.Slice(0, i));
+                    int lastpos;
                     do
                     {
                         i++;
                         p.Textto(i);
                         if (i < input.Length)
-                            sb.Append(p.ScanCharEscape());
+                            vsb.Append(p.ScanCharEscape());
                         i = p.Textpos();
                         lastpos = i;
                         while (i < input.Length && input[i] != '\\')
                             i++;
-                        sb.Append(input, lastpos, i - lastpos);
+                        vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return StringBuilderCache.GetStringAndRelease(sb);
+                    return vsb.CopyOutput(destination, false, targetSpan, out charsWritten);
                 }
             }
 
-            return input;
+            // If nothing to escape, return the input.
+            return input.CopyInput(destination, targetSpan, out charsWritten);
         }
 
         /*

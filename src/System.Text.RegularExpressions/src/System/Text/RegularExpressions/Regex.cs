@@ -276,7 +276,17 @@ namespace System.Text.RegularExpressions
             if (str == null)
                 throw new ArgumentNullException(nameof(str));
 
-            return RegexParser.Unescape(str);
+            return RegexParser.Unescape(str.AsSpan(), Span<char>.Empty, false, out _);
+        }
+
+        /// <summary>
+        /// Unescapes any escaped characters in the input text.
+        /// </summary>
+        public static int Unescape(ReadOnlySpan<char> str, Span<char> destination)
+        {
+            RegexParser.Unescape(str, destination, true, out int charsWritten);
+
+            return charsWritten;
         }
 
         /// <summary>

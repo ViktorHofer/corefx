@@ -41,6 +41,11 @@ namespace System.Text.RegularExpressions.Tests
         public void Unescape(string str, string expected)
         {
             Assert.Equal(expected, Regex.Unescape(str));
+
+            // Use Escape(ReadOnlySpan, Span)
+            Span<char> output = stackalloc char[255];
+            int charsWritten = Regex.Unescape(str.AsSpan(), output);
+            SpanTestHelpers.VerifySpan(expected, charsWritten, output);
         }
 
         [Fact]
