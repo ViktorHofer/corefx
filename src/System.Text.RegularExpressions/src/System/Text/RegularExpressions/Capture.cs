@@ -43,7 +43,7 @@ namespace System.Text.RegularExpressions
         public int Length { get; private protected set; }
 
         /// <summary>
-        /// The original string.
+        /// The original text.
         /// </summary>
         internal MemoryOrPinnedSpan<char> Text { get; private protected set; }
 

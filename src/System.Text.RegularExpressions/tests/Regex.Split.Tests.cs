@@ -3,6 +3,7 @@
 // See the LICENSE file in the project root for more information.
 
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace System.Text.RegularExpressions.Tests
@@ -110,6 +111,31 @@ namespace System.Text.RegularExpressions.Tests
             // Start is invalid
             AssertExtensions.Throws<ArgumentOutOfRangeException>("startat", () => new Regex("pattern").Split("input", 0, -1));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("startat", () => new Regex("pattern").Split("input", 0, 6));
+        }
+
+        [Theory]
+        [MemberData(nameof(Split_NonCompiled_TestData))]
+        public void Split_Span(string pattern, string input, RegexOptions options, int count, int start, string[] expected)
+        {
+            // Skip startat modification tests as we don't support startat with Span.
+            // Could change depending on decision made in API review.
+            // Discussion: https://github.com/ViktorHofer/corefx/pull/1#discussion_r172919687
+            if (start != 0 || ((options & RegexOptions.RightToLeft) != 0 && start != input.Length))
+                return;
+
+            // If RTL mode is chosen the enumerator returns the splits in the order right to left.
+            // That's different than in other API calls where RTL only applies to the search direction
+            // but not to the interpretation. More info: https://github.com/dotnet/corefx/issues/28056
+            // Need to be discussed in API review.
+            string[] exp = ((options & RegexOptions.RightToLeft) != 0) ? expected.Reverse().ToArray() : expected;
+
+            RegexSplitEnumerator regexSplitEnumerator = new Regex(pattern, options).Split(input.AsSpan(), count);
+            int i = 0;
+            foreach (ReadOnlySpan<char> span in regexSplitEnumerator)
+            {
+                Assert.Equal(exp[i], span.ToString());
+                i++;
+            }
         }
     }
 }

@@ -23,7 +23,7 @@ namespace System.Buffers
             Length = length;
         }
 
-        public static MemoryOrPinnedSpan<T> Empty => new MemoryOrPinnedSpan<T>();
+        public static MemoryOrPinnedSpan<T> Empty { get; } = new MemoryOrPinnedSpan<T>();
 
         public ReadOnlySpan<T> Span => (_pinnedSpan != null) ? new ReadOnlySpan<T>(_pinnedSpan, Length) : _memory.Span;
     }

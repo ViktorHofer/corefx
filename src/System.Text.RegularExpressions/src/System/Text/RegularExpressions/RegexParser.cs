@@ -102,7 +102,7 @@ namespace System.Text.RegularExpressions
         /*
          * Escapes all metacharacters (including |,(,),[,{,|,^,$,*,+,?,\, spaces and #)
          */
-        public static string Escape(ReadOnlySpan<char> input, Span<char> destination, bool targetSpan, out int charsWritten)
+        public static string Escape(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             for (int i = 0; i < input.Length; i++)
             {
@@ -110,7 +110,7 @@ namespace System.Text.RegularExpressions
                 {
                     Span<char> charInitSpan = stackalloc char[256];
                     var vsb = new ValueStringBuilder(charInitSpan);
-                    
+
                     char ch = input[i];
                     int lastpos;
 
@@ -149,18 +149,18 @@ namespace System.Text.RegularExpressions
                         vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return vsb.CopyOutput(destination, false, targetSpan, out charsWritten);
+                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, reverse: false);
                 }
             }
 
             // If nothing to escape, return the input.
-            return input.CopyInput(destination, targetSpan, out charsWritten);
+            return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
         /*
          * Escapes all metacharacters (including (,),[,],{,},|,^,$,*,+,?,\, spaces and #)
          */
-        public static string Unescape(ReadOnlySpan<char> input, Span<char> destination, bool targetSpan, out int charsWritten)
+        public static string Unescape(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             for (int i = 0; i < input.Length; i++)
             {
@@ -187,12 +187,12 @@ namespace System.Text.RegularExpressions
                         vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return vsb.CopyOutput(destination, false, targetSpan, out charsWritten);
+                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, reverse: false);
                 }
             }
 
             // If nothing to escape, return the input.
-            return input.CopyInput(destination, targetSpan, out charsWritten);
+            return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
         /*
