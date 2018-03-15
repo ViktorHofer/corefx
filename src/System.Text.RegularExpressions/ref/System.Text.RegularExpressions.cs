@@ -206,11 +206,11 @@ namespace System.Text.RegularExpressions
         public string[] Split(string input) { throw null; }
         public string[] Split(string input, int count) { throw null; }
         public string[] Split(string input, int count, int startat) { throw null; }
-        public RegexSplitEnumerator Split(ReadOnlySpan<char> input, int count = 0) { throw null; }
+        public SplitEnumerator Split(ReadOnlySpan<char> input, int count = 0) { throw null; }
         public static string[] Split(string input, string pattern) { throw null; }
         public static string[] Split(string input, string pattern, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static string[] Split(string input, string pattern, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
-        public static RegexSplitEnumerator Split(ReadOnlySpan<char> input, string pattern, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null) { throw null; }
+        public static SplitEnumerator Split(ReadOnlySpan<char> input, string pattern, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null) { throw null; }
         void System.Runtime.Serialization.ISerializable.GetObjectData(System.Runtime.Serialization.SerializationInfo si, System.Runtime.Serialization.StreamingContext context) { }
         public override string ToString() { throw null; }
         public static string Unescape(string str) { throw null; }
@@ -302,10 +302,10 @@ namespace System.Text.RegularExpressions
         protected RegexRunnerFactory() { }
         protected internal abstract System.Text.RegularExpressions.RegexRunner CreateInstance();
     }
-    public ref struct RegexSplitEnumerator
+    public ref struct SplitEnumerator
     {
         public ReadOnlySpan<char> Current { get; private set; }
-        public RegexSplitEnumerator GetEnumerator() => this;
+        public SplitEnumerator GetEnumerator() => this;
         public ReadOnlySpan<char> Input { get; }
         public bool MoveNext() { throw null; }
     }

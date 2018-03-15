@@ -47,10 +47,10 @@
     <Compile Include="System\Text\RegularExpressions\RegexReplacement.cs" />
     <Compile Include="System\Text\RegularExpressions\RegexRunner.cs" />
     <Compile Include="System\Text\RegularExpressions\RegexRunnerFactory.cs" />
-    <Compile Include="System\Text\RegularExpressions\RegexSplitEnumerator.cs" />
     <Compile Include="System\Text\RegularExpressions\RegexTree.cs" />
     <Compile Include="System\Text\RegularExpressions\RegexWriter.cs" />
     <Compile Include="System\Text\ValueStringBuilder.Reverse.cs" />
+    <Compile Include="System\Text\RegularExpressions\SplitEnumerator.cs" />
     <!-- Common or Common-branched source files -->
     <Compile Include="$(CommonPath)\System\NotImplemented.cs">
       <Link>Common\System\NotImplemented.cs</Link>

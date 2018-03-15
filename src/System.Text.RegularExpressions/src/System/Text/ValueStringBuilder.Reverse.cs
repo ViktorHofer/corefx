@@ -6,7 +6,7 @@ namespace System.Text
 {
     internal ref partial struct ValueStringBuilder
     {
-        public unsafe void AppendReversed(ReadOnlySpan<char> value)
+        public void AppendReversed(ReadOnlySpan<char> value)
         {
             int pos = _pos;
             if (pos > _chars.Length - value.Length)

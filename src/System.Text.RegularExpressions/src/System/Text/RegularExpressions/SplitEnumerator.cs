@@ -6,7 +6,7 @@ using System.Buffers;
 
 namespace System.Text.RegularExpressions
 {
-    public ref struct RegexSplitEnumerator
+    public ref struct SplitEnumerator
     {
         private readonly Regex _regex;
         private readonly int _count;
@@ -15,7 +15,7 @@ namespace System.Text.RegularExpressions
         private int _inputIndex;
         private int _groupIndex;
 
-        internal RegexSplitEnumerator(Regex regex, ReadOnlySpan<char> input, int count)
+        internal SplitEnumerator(Regex regex, ReadOnlySpan<char> input, int count)
         {
             _regex = regex;
             Input = input;
@@ -36,7 +36,7 @@ namespace System.Text.RegularExpressions
         /// </summary>
         public ReadOnlySpan<char> Input { get; }
 
-        public RegexSplitEnumerator GetEnumerator() => this;
+        public SplitEnumerator GetEnumerator() => this;
 
         // Count <0 => throw in public API.
         // Count 0 => no boundary, iterate over all matches.

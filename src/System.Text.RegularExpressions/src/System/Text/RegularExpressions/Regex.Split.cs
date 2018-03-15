@@ -30,7 +30,7 @@ namespace System.Text.RegularExpressions
             return new Regex(pattern, options, matchTimeout, true).Split(input);
         }
 
-        public static RegexSplitEnumerator Split(ReadOnlySpan<char> input, string pattern, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
+        public static SplitEnumerator Split(ReadOnlySpan<char> input, string pattern, RegexOptions options = RegexOptions.None, TimeSpan? matchTimeout = null)
         {
             return new Regex(pattern, options, matchTimeout ?? s_defaultMatchTimeout, true).Split(input);
         }
@@ -59,12 +59,12 @@ namespace System.Text.RegularExpressions
             return SplitImpl(input, count, UseOptionR() ? input.Length : 0);
         }
 
-        public RegexSplitEnumerator Split(ReadOnlySpan<char> input, int count = 0)
+        public SplitEnumerator Split(ReadOnlySpan<char> input, int count = 0)
         {
             if (count < 0)
                 throw new ArgumentOutOfRangeException(nameof(count), SR.CountTooSmall);
 
-            return new RegexSplitEnumerator(this, input, count);
+            return new SplitEnumerator(this, input, count);
         }
 
         /// <summary>

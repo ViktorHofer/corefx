@@ -21,6 +21,7 @@ namespace System.Text.RegularExpressions
 {
     internal sealed class RegexParser
     {
+        private const int DefaultEscapeBufferSize = 255;
         private const int MaxValueDiv10 = int.MaxValue / 10;
         private const int MaxValueMod10 = int.MaxValue % 10;
 
@@ -108,7 +109,7 @@ namespace System.Text.RegularExpressions
             {
                 if (IsMetachar(input[i]))
                 {
-                    Span<char> charInitSpan = stackalloc char[256];
+                    Span<char> charInitSpan = stackalloc char[DefaultEscapeBufferSize];
                     var vsb = new ValueStringBuilder(charInitSpan);
 
                     char ch = input[i];
@@ -169,7 +170,7 @@ namespace System.Text.RegularExpressions
                     RegexParser p = new RegexParser(CultureInfo.InvariantCulture);
                     p.SetPattern(input.ToString());
 
-                    Span<char> charInitSpan = stackalloc char[256];
+                    Span<char> charInitSpan = stackalloc char[DefaultEscapeBufferSize];
                     var vsb = new ValueStringBuilder(charInitSpan);
 
                     vsb.Append(input.Slice(0, i));
