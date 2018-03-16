@@ -13,9 +13,9 @@ namespace System.Text
             span.Reverse();
         }
 
-        public void Reverse(int start = 0, int length = 0)
+        public void Reverse()
         {
-            _chars.Slice(start, length > 0 ? length : _pos).Reverse();
+            _chars.Slice(0, _pos).Reverse();
         }
     }
 }

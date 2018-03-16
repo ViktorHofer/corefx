@@ -484,12 +484,21 @@ namespace System.Text.RegularExpressions
                 throw new ArgumentOutOfRangeException(nameof(length), SR.LengthNotNegative);
 
             Match match;
+            object obj = _runnerref.Get();
 
             // Interpreted
             if (factory == null)
             {
-                RegexInterpreter interpretedRunner = _runnerref.Get() as RegexInterpreter ??
-                    new RegexInterpreter(_code, UseOptionInvariant() ? CultureInfo.InvariantCulture : CultureInfo.CurrentCulture);
+                RegexInterpreter interpretedRunner;
+                if (obj is RegexInterpreter interpreted)
+                    interpretedRunner = interpreted;
+                else
+                {
+                    if (obj != null)
+                        _runnerref.Release(obj);
+
+                    interpretedRunner = new RegexInterpreter(_code, UseOptionInvariant() ? CultureInfo.InvariantCulture : CultureInfo.CurrentCulture);
+                }
 
                 try
                 {
@@ -503,8 +512,17 @@ namespace System.Text.RegularExpressions
             // Compiled
             else
             {
-                RegexRunner compiledRunner = _runnerref.Get() as RegexRunner ??
-                    factory.CreateInstance();
+
+                RegexRunner compiledRunner;
+                if (obj is RegexRunner compiled)
+                    compiledRunner = compiled;
+                else
+                {
+                    if (obj != null)
+                        _runnerref.Release(obj);
+
+                    compiledRunner = factory.CreateInstance();
+                }
 
                 try
                 {

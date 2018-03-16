@@ -23,7 +23,7 @@ namespace System.Text.RegularExpressions
         /// Creates a Capture with an input string, a start index of the capture
         /// and the length of the captured string.
         /// </summary>
-        /// <param name="text">The input string provided by the user wrapped in a Memory.</param>
+        /// <param name="text">The input string provided by the user wrapped in a MemoryOrPinnedSpan.</param>
         internal Capture(in MemoryOrPinnedSpan<char> text, int index, int length)
         {
             Text = text;
