@@ -69,7 +69,7 @@ namespace System.Text.RegularExpressions
         /// <summary>
         /// Returns an empty Match object.
         /// </summary>
-        public static Match Empty { get; } = new Match(null, 1, MemoryOrPinnedSpan<char>.Empty, 0, 0, 0);
+        public static Match Empty { get; } = new Match(null, 1, default, 0, 0, 0);
 
         /// <summary>
         /// Required for creating the next match and for evaluating a replacement pattern.
@@ -179,7 +179,7 @@ namespace System.Text.RegularExpressions
 
             // Writes the ValueStringBuilder's content either into the output Span or returns 
             // a string depending on the targetSpan switch.
-            return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, reverse: false);
+            return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
         internal ReadOnlySpan<char> GroupToStringImpl(ReadOnlySpan<char> input, int groupnum)

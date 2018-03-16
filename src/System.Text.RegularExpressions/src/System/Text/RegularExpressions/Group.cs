@@ -17,7 +17,7 @@ namespace System.Text.RegularExpressions
     /// </summary>
     public class Group : Capture
     {
-        internal static readonly Group s_emptyGroup = new Group(MemoryOrPinnedSpan<char>.Empty, Array.Empty<int>(), 0, string.Empty);
+        internal static readonly Group s_emptyGroup = new Group(default, Array.Empty<int>(), 0, string.Empty);
 
         internal readonly int[] _caps;
         internal int _capcount;

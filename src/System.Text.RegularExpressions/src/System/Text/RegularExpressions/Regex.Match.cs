@@ -88,7 +88,7 @@ namespace System.Text.RegularExpressions
 
         private bool IsMatch(ReadOnlySpan<char> input, int startat)
         {
-            return (Run(true, -1, MemoryOrPinnedSpan<char>.Empty, input, 0, input.Length, startat) == null);
+            return (Run(true, -1, default, input, 0, input.Length, startat) == null);
         }
 
         /// <summary>

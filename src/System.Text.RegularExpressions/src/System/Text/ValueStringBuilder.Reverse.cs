@@ -8,16 +8,9 @@ namespace System.Text
     {
         public void AppendReversed(ReadOnlySpan<char> value)
         {
-            int pos = _pos;
-            if (pos > _chars.Length - value.Length)
-            {
-                Grow(value.Length);
-            }
-
-            Span<char> slice = _chars.Slice(_pos, value.Length);
-            value.CopyTo(slice);
-            slice.Reverse();
-            _pos += value.Length;
+            Span<char> span = AppendSpan(value.Length);
+            value.CopyTo(span);
+            span.Reverse();
         }
 
         public void Reverse(int start = 0, int length = 0)

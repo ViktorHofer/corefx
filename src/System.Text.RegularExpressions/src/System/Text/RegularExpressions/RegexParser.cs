@@ -150,7 +150,7 @@ namespace System.Text.RegularExpressions
                         vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, reverse: false);
+                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
                 }
             }
 
@@ -188,7 +188,7 @@ namespace System.Text.RegularExpressions
                         vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess, reverse: false);
+                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
                 }
             }
 

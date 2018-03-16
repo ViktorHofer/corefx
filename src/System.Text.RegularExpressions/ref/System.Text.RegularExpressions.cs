@@ -136,6 +136,12 @@ namespace System.Text.RegularExpressions
     public delegate string MatchEvaluator(System.Text.RegularExpressions.Match match);
     public partial class Regex : System.Runtime.Serialization.ISerializable
     {
+        public ref struct SplitEnumerator
+        {
+            public ReadOnlySpan<char> Current { get { throw null; } }
+            public SplitEnumerator GetEnumerator() { throw null; }
+            public bool MoveNext() { throw null; }
+        }
         protected internal System.Collections.Hashtable caps;
         protected internal System.Collections.Hashtable capnames;
         protected internal int capsize;
@@ -189,19 +195,19 @@ namespace System.Text.RegularExpressions
         public static System.Text.RegularExpressions.MatchCollection Matches(ReadOnlyMemory<char> input, string pattern, System.Text.RegularExpressions.RegexOptions options = RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
         public string Replace(string input, string replacement) { throw null; }
         public string Replace(string input, string replacement, int count) { throw null; }
-        public bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string replacement, int count = -1) { throw null; }
+        public bool TryReplace(ReadOnlySpan<char> input, string replacement, Span<char> destination, out int charsWritten, int count = -1) { throw null; }
         public string Replace(string input, string replacement, int count, int startat) { throw null; }
         public static string Replace(string input, string pattern, string replacement) { throw null; }
         public static string Replace(string input, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static string Replace(string input, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
-        public static bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string pattern, string replacement, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
+        public static bool TryReplace(ReadOnlySpan<char> input, string pattern, string replacement, Span<char> destination, out int charsWritten, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
         public static string Replace(string input, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator) { throw null; }
         public static string Replace(string input, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, System.Text.RegularExpressions.RegexOptions options) { throw null; }
         public static string Replace(string input, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, System.Text.RegularExpressions.RegexOptions options, System.TimeSpan matchTimeout) { throw null; }
-        public static bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
+        public static bool TryReplace(ReadOnlySpan<char> input, string pattern, System.Text.RegularExpressions.MatchEvaluator evaluator, Span<char> destination, out int charsWritten, System.Text.RegularExpressions.RegexOptions options = System.Text.RegularExpressions.RegexOptions.None, System.TimeSpan? matchTimeout = null) { throw null; }
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator) { throw null; }
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator, int count) { throw null; }
-        public bool TryReplace(ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, System.Text.RegularExpressions.MatchEvaluator evaluator, int count = -1) { throw null; }
+        public bool TryReplace(ReadOnlySpan<char> input, System.Text.RegularExpressions.MatchEvaluator evaluator, Span<char> destination, out int charsWritten, int count = -1) { throw null; }
         public string Replace(string input, System.Text.RegularExpressions.MatchEvaluator evaluator, int count, int startat) { throw null; }
         public string[] Split(string input) { throw null; }
         public string[] Split(string input, int count) { throw null; }
@@ -301,12 +307,5 @@ namespace System.Text.RegularExpressions
     {
         protected RegexRunnerFactory() { }
         protected internal abstract System.Text.RegularExpressions.RegexRunner CreateInstance();
-    }
-    public ref struct SplitEnumerator
-    {
-        public ReadOnlySpan<char> Current { get; private set; }
-        public SplitEnumerator GetEnumerator() => this;
-        public ReadOnlySpan<char> Input { get; }
-        public bool MoveNext() { throw null; }
     }
 }

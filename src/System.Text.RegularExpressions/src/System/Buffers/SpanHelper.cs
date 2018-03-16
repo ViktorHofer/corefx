@@ -13,10 +13,7 @@ namespace System.Buffers
             if (targetSpan)
             {
                 spanSuccess = input.TryCopyTo(destination);
-                if (spanSuccess)
-                    charsWritten = input.Length;
-                else
-                    charsWritten = 0;
+                charsWritten = spanSuccess ? input.Length : 0;
 
                 return null;
             }
@@ -28,11 +25,8 @@ namespace System.Buffers
             }
         }
 
-        public static string CopyOutput(this ValueStringBuilder vsb, bool targetSpan, Span<char> destination, out int charsWritten, out bool spanSuccess, bool reverse)
+        public static string CopyOutput(this ValueStringBuilder vsb, bool targetSpan, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
-            if (reverse)
-                vsb.Reverse();
-
             if (targetSpan)
             {
                 spanSuccess = vsb.TryCopyTo(destination, out charsWritten);

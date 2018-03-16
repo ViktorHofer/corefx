@@ -38,12 +38,12 @@ namespace System.Text.RegularExpressions
         public int Index { get; private protected set; }
 
         /// <summary>
-        /// The length of the captured substring.
+        /// Returns the length of the captured substring.
         /// </summary>
         public int Length { get; private protected set; }
 
         /// <summary>
-        /// The original text.
+        /// Returns the original text.
         /// </summary>
         internal MemoryOrPinnedSpan<char> Text { get; private protected set; }
 

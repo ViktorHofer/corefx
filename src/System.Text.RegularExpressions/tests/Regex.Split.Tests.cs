@@ -129,7 +129,7 @@ namespace System.Text.RegularExpressions.Tests
             // Need to be discussed in API review.
             string[] exp = ((options & RegexOptions.RightToLeft) != 0) ? expected.Reverse().ToArray() : expected;
 
-            RegexSplitEnumerator regexSplitEnumerator = new Regex(pattern, options).Split(input.AsSpan(), count);
+            Regex.SplitEnumerator regexSplitEnumerator = new Regex(pattern, options).Split(input.AsSpan(), count);
             int i = 0;
             foreach (ReadOnlySpan<char> span in regexSplitEnumerator)
             {

@@ -7,25 +7,24 @@ namespace System.Buffers
     internal unsafe readonly struct MemoryOrPinnedSpan<T>
     {
         private readonly ReadOnlyMemory<T> _memory;
-        private readonly char* _pinnedSpan;
+        private readonly char* _ptr;
+        private readonly int _length;
 
         public MemoryOrPinnedSpan(ReadOnlyMemory<T> memory)
         {
             _memory = memory;
-            Length = memory.Length;
-            _pinnedSpan = null;
+            _length = memory.Length;
+            _ptr = null;
         }
 
         public MemoryOrPinnedSpan(char* pinnedSpan, int length)
         {
-            _pinnedSpan = pinnedSpan;
-            Length = length;
+            _ptr = pinnedSpan;
+            _length = length;
         }
 
-        public static MemoryOrPinnedSpan<T> Empty { get; } = new MemoryOrPinnedSpan<T>();
+        public int Length => _length;
 
-        public int Length { get; }
-
-        public ReadOnlySpan<T> Span => (_pinnedSpan != null) ? new ReadOnlySpan<T>(_pinnedSpan, Length) : _memory.Span;
+        public ReadOnlySpan<T> Span => (_ptr != null) ? new ReadOnlySpan<T>(_ptr, Length) : _memory.Span;
     }
 }
