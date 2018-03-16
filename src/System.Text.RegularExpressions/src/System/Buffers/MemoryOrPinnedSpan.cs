@@ -6,7 +6,6 @@ namespace System.Buffers
 {
     internal unsafe readonly struct MemoryOrPinnedSpan<T>
     {
-        public readonly int Length;
         private readonly ReadOnlyMemory<T> _memory;
         private readonly char* _pinnedSpan;
 
@@ -24,6 +23,8 @@ namespace System.Buffers
         }
 
         public static MemoryOrPinnedSpan<T> Empty { get; } = new MemoryOrPinnedSpan<T>();
+
+        public int Length { get; }
 
         public ReadOnlySpan<T> Span => (_pinnedSpan != null) ? new ReadOnlySpan<T>(_pinnedSpan, Length) : _memory.Span;
     }
