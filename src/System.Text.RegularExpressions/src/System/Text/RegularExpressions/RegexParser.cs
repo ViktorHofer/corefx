@@ -21,7 +21,7 @@ namespace System.Text.RegularExpressions
 {
     internal sealed class RegexParser
     {
-        private const int DefaultEscapeBufferSize = 255;
+        private const int DefaultEscapeBufferSize = 256;
         private const int MaxValueDiv10 = int.MaxValue / 10;
         private const int MaxValueMod10 = int.MaxValue % 10;
 
