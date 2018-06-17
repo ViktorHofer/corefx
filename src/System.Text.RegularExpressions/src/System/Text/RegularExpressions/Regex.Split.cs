@@ -187,6 +187,7 @@ namespace System.Text.RegularExpressions
                 _match = null;
                 _inputIndex = _regex.RightToLeft ? input.Length : 0;
                 _groupIndex = 1;
+                Current = null;
             }
 
             /// <summary>

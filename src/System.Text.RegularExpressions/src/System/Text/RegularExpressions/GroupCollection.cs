@@ -224,7 +224,7 @@ namespace System.Text.RegularExpressions
 
         public bool ContainsKey(string key)
         {
-            return _match._regex.GroupNumberFromName(key) >= 0;
+            return _match.Regex.GroupNumberFromName(key) >= 0;
         }
 
         public IEnumerable<string> Keys

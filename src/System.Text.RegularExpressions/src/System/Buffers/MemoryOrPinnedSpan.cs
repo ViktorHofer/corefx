@@ -21,6 +21,7 @@ namespace System.Buffers
         {
             _ptr = pinnedSpan;
             _length = length;
+            _memory = null;
         }
 
         public int Length => _length;

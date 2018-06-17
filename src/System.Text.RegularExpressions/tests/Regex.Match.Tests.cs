@@ -858,26 +858,7 @@ namespace System.Text.RegularExpressions.Tests
             AssertExtensions.Throws<ArgumentOutOfRangeException>("length", () => new Regex("pattern").Match("input", 0, -1));
             AssertExtensions.Throws<ArgumentOutOfRangeException>("length", () => new Regex("pattern").Match("input", 0, 6));
         }
-
-        [Theory]
-        [InlineData(")")]
-        [InlineData("())")]
-        [InlineData("[a-z-[aeiuo]")]
-        [InlineData("[a-z-[aeiuo")]
-        [InlineData("[a-z-[b]")]
-        [InlineData("[a-z-[b")]
-        [InlineData("[b-a]")]
-        [InlineData(@"[a-c]{2,1}")]
-        [InlineData(@"\d{2147483648}")]
-        [InlineData("[a-z-[b][")]
-        [InlineData(@"\")]
-        [InlineData("(?()|||||)")]
-        public void Match_InvalidPattern(string pattern)
-        {
-            AssertExtensions.Throws<ArgumentException>(null, () => Regex.Match("input", pattern));
-            AssertExtensions.Throws<ArgumentException>(null, () => Regex.Match("input".AsMemory(), pattern));
-        }
-
+        
         [Fact]
         public void IsMatch_Invalid()
         {
