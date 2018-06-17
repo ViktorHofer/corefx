@@ -2071,18 +2071,24 @@ namespace System.Text.RegularExpressions
 
             if (cch > 1)
             {
-                string str = _pattern.Substring(pos, cch);
-
+                string str;
                 if (UseOptionI() && !isReplacement)
                 {
-                    // We do the ToLower character by character for consistency.  With surrogate chars, doing
-                    // a ToLower on the entire string could actually change the surrogate pair.  This is more correct
-                    // linguistically, but since Regex doesn't support surrogates, it's more important to be
-                    // consistent.
-                    StringBuilder sb = StringBuilderCache.Acquire(str.Length);
-                    for (int i = 0; i < str.Length; i++)
-                        sb.Append(_culture.TextInfo.ToLower(str[i]));
-                    str = StringBuilderCache.GetStringAndRelease(sb);
+                    str = string.Create(cch, (_pattern, _culture, pos, cch), (span, state) =>
+                    {
+                        ReadOnlySpan<char> input = state._pattern.AsSpan(pos, cch);
+
+                        // We do the ToLower character by character for consistency.  With surrogate chars, doing
+                        // a ToLower on the entire string could actually change the surrogate pair.  This is more correct
+                        // linguistically, but since Regex doesn't support surrogates, it's more important to be
+                        // consistent.
+                        for (int i = 0; i < input.Length; i++)
+                            span[i] = state._culture.TextInfo.ToLower(input[i]);
+                    });
+                }
+                else
+                {
+                    str = _pattern.Substring(pos, cch);
                 }
 
                 node = new RegexNode(RegexNode.Multi, _options, str);

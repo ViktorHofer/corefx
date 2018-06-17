@@ -54,9 +54,6 @@
     <Compile Include="$(CommonPath)\System\NotImplemented.cs">
       <Link>Common\System\NotImplemented.cs</Link>
     </Compile>
-    <Compile Include="$(CommonPath)\CoreLib\System\Text\StringBuilderCache.cs">
-      <Link>Common\System\Text\StringBuilderCache.cs</Link>
-    </Compile>
     <Compile Include="$(CommonPath)\CoreLib\System\Collections\Generic\ValueListBuilder.cs">
       <Link>Common\System\Collections\Generic\ValueListBuilder.cs</Link>
     </Compile>

@@ -35,7 +35,8 @@ namespace System.Text.RegularExpressions
             if (concat.Type() != RegexNode.Concatenate)
                 throw new ArgumentException(SR.ReplacementError);
 
-            StringBuilder sb = StringBuilderCache.Acquire();
+            Span<char> buffer = stackalloc char[256];
+            ValueStringBuilder vsb = new ValueStringBuilder(buffer);
             List<string> strings = new List<string>();
             List<int> rules = new List<int>();
 
@@ -46,19 +47,19 @@ namespace System.Text.RegularExpressions
                 switch (child.Type())
                 {
                     case RegexNode.Multi:
-                        sb.Append(child.Str);
+                        vsb.Append(child.Str);
                         break;
 
                     case RegexNode.One:
-                        sb.Append(child.Ch);
+                        vsb.Append(child.Ch);
                         break;
 
                     case RegexNode.Ref:
-                        if (sb.Length > 0)
+                        if (vsb.Length > 0)
                         {
                             rules.Add(strings.Count);
-                            strings.Add(sb.ToString());
-                            sb.Length = 0;
+                            strings.Add(vsb.ToString());
+                            vsb.Length = 0;
                         }
                         int slot = child.M;
 
@@ -73,13 +74,11 @@ namespace System.Text.RegularExpressions
                 }
             }
 
-            if (sb.Length > 0)
+            if (vsb.Length > 0)
             {
                 rules.Add(strings.Count);
-                strings.Add(sb.ToString());
+                strings.Add(vsb.ToString());
             }
-
-            StringBuilderCache.Release(sb);
 
             Pattern = rep;
             _strings = strings;
