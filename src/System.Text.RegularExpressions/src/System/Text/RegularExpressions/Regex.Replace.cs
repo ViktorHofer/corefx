@@ -275,8 +275,7 @@ namespace System.Text.RegularExpressions
 
             // We need to create a Memory<char> as the match evaluator could access the Value
             // which we usually leave empty during Replace and IsMatch calls to reduce costs.
-            // By using a custom OwnedMemory and passing just the Span's pointer to it we avoid
-            // copying of the input.
+            // We avoid copying the input by just passing the Span's pointer around.
             fixed (char* ptr = &MemoryMarshal.GetReference(input))
             {
                 var mem = new MemoryOrPinnedSpan<char>(ptr, input.Length);
