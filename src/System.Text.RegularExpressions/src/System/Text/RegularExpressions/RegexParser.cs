@@ -10,6 +10,7 @@
 // It would be nice to get rid of the comment modes, since the
 // ScanBlank() calls are just kind of duct-taped in.
 
+using System.Buffers;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -20,6 +21,7 @@ namespace System.Text.RegularExpressions
 {
     internal sealed class RegexParser
     {
+        private const int DefaultEscapeBufferSize = 256;
         private const int MaxValueDiv10 = int.MaxValue / 10;
         private const int MaxValueMod10 = int.MaxValue % 10;
 
@@ -101,20 +103,22 @@ namespace System.Text.RegularExpressions
         /*
          * Escapes all metacharacters (including |,(,),[,{,|,^,$,*,+,?,\, spaces and #)
          */
-        public static string Escape(string input)
+        public static string Escape(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             for (int i = 0; i < input.Length; i++)
             {
                 if (IsMetachar(input[i]))
                 {
-                    StringBuilder sb = StringBuilderCache.Acquire();
+                    Span<char> charInitSpan = stackalloc char[DefaultEscapeBufferSize];
+                    var vsb = new ValueStringBuilder(charInitSpan);
+
                     char ch = input[i];
                     int lastpos;
 
-                    sb.Append(input, 0, i);
+                    vsb.Append(input.Slice(0, i));
                     do
                     {
-                        sb.Append('\\');
+                        vsb.Append('\\');
                         switch (ch)
                         {
                             case '\n':
@@ -130,7 +134,7 @@ namespace System.Text.RegularExpressions
                                 ch = 'f';
                                 break;
                         }
-                        sb.Append(ch);
+                        vsb.Append(ch);
                         i++;
                         lastpos = i;
 
@@ -143,49 +147,53 @@ namespace System.Text.RegularExpressions
                             i++;
                         }
 
-                        sb.Append(input, lastpos, i - lastpos);
+                        vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return StringBuilderCache.GetStringAndRelease(sb);
+                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
                 }
             }
 
-            return input;
+            // If nothing to escape, return the input.
+            return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
         /*
          * Escapes all metacharacters (including (,),[,],{,},|,^,$,*,+,?,\, spaces and #)
          */
-        public static string Unescape(string input)
+        public static string Unescape(bool targetSpan, ReadOnlySpan<char> input, Span<char> destination, out int charsWritten, out bool spanSuccess)
         {
             for (int i = 0; i < input.Length; i++)
             {
                 if (input[i] == '\\')
                 {
-                    StringBuilder sb = StringBuilderCache.Acquire();
                     RegexParser p = new RegexParser(CultureInfo.InvariantCulture);
-                    int lastpos;
-                    p.SetPattern(input);
+                    p.SetPattern(input.ToString());
 
-                    sb.Append(input, 0, i);
+                    Span<char> charInitSpan = stackalloc char[DefaultEscapeBufferSize];
+                    var vsb = new ValueStringBuilder(charInitSpan);
+
+                    vsb.Append(input.Slice(0, i));
+                    int lastpos;
                     do
                     {
                         i++;
                         p.Textto(i);
                         if (i < input.Length)
-                            sb.Append(p.ScanCharEscape());
+                            vsb.Append(p.ScanCharEscape());
                         i = p.Textpos();
                         lastpos = i;
                         while (i < input.Length && input[i] != '\\')
                             i++;
-                        sb.Append(input, lastpos, i - lastpos);
+                        vsb.Append(input.Slice(lastpos, i - lastpos));
                     } while (i < input.Length);
 
-                    return StringBuilderCache.GetStringAndRelease(sb);
+                    return vsb.CopyOutput(targetSpan, destination, out charsWritten, out spanSuccess);
                 }
             }
 
-            return input;
+            // If nothing to escape, return the input.
+            return input.CopyInput(targetSpan, destination, out charsWritten, out spanSuccess);
         }
 
         /*
@@ -2063,18 +2071,24 @@ namespace System.Text.RegularExpressions
 
             if (cch > 1)
             {
-                string str = _pattern.Substring(pos, cch);
-
+                string str;
                 if (UseOptionI() && !isReplacement)
                 {
-                    // We do the ToLower character by character for consistency.  With surrogate chars, doing
-                    // a ToLower on the entire string could actually change the surrogate pair.  This is more correct
-                    // linguistically, but since Regex doesn't support surrogates, it's more important to be
-                    // consistent.
-                    StringBuilder sb = StringBuilderCache.Acquire(str.Length);
-                    for (int i = 0; i < str.Length; i++)
-                        sb.Append(_culture.TextInfo.ToLower(str[i]));
-                    str = StringBuilderCache.GetStringAndRelease(sb);
+                    str = string.Create(cch, (_pattern, _culture, pos, cch), (span, state) =>
+                    {
+                        ReadOnlySpan<char> input = state._pattern.AsSpan(pos, cch);
+
+                        // We do the ToLower character by character for consistency.  With surrogate chars, doing
+                        // a ToLower on the entire string could actually change the surrogate pair.  This is more correct
+                        // linguistically, but since Regex doesn't support surrogates, it's more important to be
+                        // consistent.
+                        for (int i = 0; i < input.Length; i++)
+                            span[i] = state._culture.TextInfo.ToLower(input[i]);
+                    });
+                }
+                else
+                {
+                    str = _pattern.Substring(pos, cch);
                 }
 
                 node = new RegexNode(RegexNode.Multi, _options, str);

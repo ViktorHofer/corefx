@@ -5,6 +5,7 @@
 // The Regex class represents a single compiled instance of a regular
 // expression.
 
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -34,10 +35,9 @@ namespace System.Text.RegularExpressions
         protected internal string[] capslist;                // if captures are sparse or named captures are used, this is the sorted list of names
         protected internal int capsize;                      // the size of the capture array
         
-        internal ExclusiveReference _runnerref;              // cached runner
-        internal WeakReference<RegexReplacement> _replref; // cached parsed replacement pattern
-        internal RegexCode _code;                            // if interpreted, this is the code for RegexInterpreter
-        internal bool _refsInitialized = false;
+        private ExclusiveReference _runnerref;               // cached runner
+        private RegexCode _code;                             // if interpreted, this is the code for RegexInterpreter
+        private bool _refsInitialized = false;
 
         protected Regex()
         {
@@ -149,7 +149,7 @@ namespace System.Text.RegularExpressions
 
                 // Cache runner and replacement
                 _runnerref = cached.Runnerref;
-                _replref = cached.ReplRef;
+                ReplRef = cached.ReplRef;
                 _refsInitialized = true;
             }
 
@@ -201,6 +201,11 @@ namespace System.Text.RegularExpressions
             }
         }
 
+        /// <summary>
+        /// Cached parsed replacement pattern.
+        /// </summary>
+        internal WeakReference<RegexReplacement> ReplRef { get; private set; } 
+
 #if FEATURE_COMPILED
         /// <summary>
         /// This method is here for perf reasons: if the call to RegexCompiler is NOT in the 
@@ -243,7 +248,24 @@ namespace System.Text.RegularExpressions
             if (str == null)
                 throw new ArgumentNullException(nameof(str));
 
-            return RegexParser.Escape(str);
+            return RegexParser.Escape(targetSpan: false, str.AsSpan(), Span<char>.Empty, out _, out _);
+        }
+
+        /// <summary>
+        /// Escapes a minimal set of metacharacters (\, *, +, ?, |, {, [, (, ), ^, $, ., #, and
+        /// whitespace) by replacing them with their \ codes. This converts a string so that
+        /// it can be used as a constant within a regular expression safely. (Note that the
+        /// reason # and whitespace must be escaped is so the string can be used safely
+        /// within an expression parsed with x mode. If future Regex features add
+        /// additional metacharacters, developers should depend on Escape to escape those
+        /// characters as well.)
+        /// </summary>
+        /// <returns>Returns the amount of chars written into the output Span.</returns>
+        public static bool TryEscape(ReadOnlySpan<char> str, Span<char> destination, out int charsWritten)
+        {
+            RegexParser.Escape(targetSpan: true, str, destination, out charsWritten, out bool spanSuccess);
+
+            return spanSuccess;
         }
 
         /// <summary>
@@ -254,7 +276,17 @@ namespace System.Text.RegularExpressions
             if (str == null)
                 throw new ArgumentNullException(nameof(str));
 
-            return RegexParser.Unescape(str);
+            return RegexParser.Unescape(targetSpan: false, str.AsSpan(), Span<char>.Empty, out _, out _);
+        }
+
+        /// <summary>
+        /// Unescapes any escaped characters in the input text.
+        /// </summary>
+        public static bool TryUnescape(ReadOnlySpan<char> str, Span<char> destination, out int charsWritten)
+        {
+            RegexParser.Unescape(targetSpan: true, str, destination, out charsWritten, out bool spanSuccess);
+
+            return spanSuccess;
         }
 
         /// <summary>
@@ -430,44 +462,77 @@ namespace System.Text.RegularExpressions
 
             _refsInitialized = true;
             _runnerref = new ExclusiveReference();
-            _replref = new WeakReference<RegexReplacement>(null);
+            ReplRef = new WeakReference<RegexReplacement>(null);
         }
 
         /// <summary>
-        /// Internal worker called by all the public APIs
+        /// Internal worker called by all the public APIs. Accepts both a Memory and Span. Usually one of these 
+        /// two is empty depending on the scenario. Unidirectional APIs that are unidirectional like IsMatch, 
+        /// Replace (with no MatchEvaluator) and Split should pass the input text as a Span (with an empty Memory).
+        /// Bidirectional APIs where the input needs to be passed around i.e. Match and Matches, should pass the input
+        /// text as a Memory (with an empty Span). Replace with an MatchEvaluator is special as it's unidirectional but
+        /// the evaluator can access the Match object which is the internal state and contains the input text.
         /// </summary>
-        /// <returns></returns>
-        internal Match Run(bool quick, int prevlen, string input, int beginning, int length, int startat)
+        internal Match Run(bool quick, int prevlen, in MemoryOrPinnedSpan<char> mem, ReadOnlySpan<char> span, int beginning, int length, int startat)
         {
+            // If a non empty Span is passed, use it and avoid Span creation from Memory.
+            ReadOnlySpan<char> input = !span.IsEmpty ? span : mem.Span;
+
             if (startat < 0 || startat > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(startat), SR.BeginIndexNotNegative);
-
             if (length < 0 || length > input.Length)
                 throw new ArgumentOutOfRangeException(nameof(length), SR.LengthNotNegative);
 
-            // There may be a cached runner; grab ownership of it if we can.
-            RegexRunner runner = _runnerref.Get();
-
-            // Create a RegexRunner instance if we need to
-            if (runner == null)
-            {
-                // Use the compiled RegexRunner factory if the code was compiled to MSIL
-                if (factory != null)
-                    runner = factory.CreateInstance();
-                else
-                    runner = new RegexInterpreter(_code, UseOptionInvariant() ? CultureInfo.InvariantCulture : CultureInfo.CurrentCulture);
-            }
-
             Match match;
-            try
+            object obj = _runnerref.Get();
+
+            // Interpreted
+            if (factory == null)
             {
-                // Do the scan starting at the requested position
-                match = runner.Scan(this, input, beginning, beginning + length, startat, prevlen, quick, internalMatchTimeout);
+                RegexInterpreter interpretedRunner;
+                if (obj is RegexInterpreter interpreted)
+                    interpretedRunner = interpreted;
+                else
+                {
+                    if (obj != null)
+                        _runnerref.Release(obj);
+
+                    interpretedRunner = new RegexInterpreter(_code, UseOptionInvariant() ? CultureInfo.InvariantCulture : CultureInfo.CurrentCulture);
+                }
+
+                try
+                {
+                    match = interpretedRunner.Scan(this, mem, input, beginning, beginning + length, startat, prevlen, quick, internalMatchTimeout);
+                }
+                finally
+                {
+                    _runnerref.Release(interpretedRunner);
+                }
             }
-            finally
+            // Compiled
+            else
             {
-                // Release or fill the cache slot
-                _runnerref.Release(runner);
+
+                RegexRunner compiledRunner;
+                if (obj is RegexRunner compiled)
+                    compiledRunner = compiled;
+                else
+                {
+                    if (obj != null)
+                        _runnerref.Release(obj);
+
+                    compiledRunner = factory.CreateInstance();
+                }
+
+                try
+                {
+                    // Currently we don't support Span/Memory in compiled runners.
+                    match = compiledRunner.Scan(this, input.ToString(), beginning, beginning + length, startat, prevlen, quick, internalMatchTimeout);
+                }
+                finally
+                {
+                    _runnerref.Release(compiledRunner);
+                }
             }
 
 #if DEBUG

@@ -92,7 +92,7 @@ namespace System.Text.RegularExpressions
                 // it wasn't in the cache, so we'll add a new one
                 if (entry == null && isToAdd && s_cacheSize != 0) // check cache size again in case it changed
                 {
-                    entry = new CachedCodeEntry(key, capnames, capslist, _code, caps, capsize, _runnerref, _replref);
+                    entry = new CachedCodeEntry(key, capnames, capslist, _code, caps, capsize, _runnerref, ReplRef);
                     // put first in linked list:
                     if (s_cacheFirst != null)
                     {

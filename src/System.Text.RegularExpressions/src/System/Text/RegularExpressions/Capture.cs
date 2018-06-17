@@ -7,15 +7,24 @@
 // search may return multiple Capture within each capturing
 // RegexGroup.
 
+using System.Buffers;
+
 namespace System.Text.RegularExpressions
 {
     /// <summary>
     /// Represents the results from a single subexpression capture. The object represents
-    /// one substring for a single successful capture.
+    /// the input slice for a single successful capture.
     /// </summary>
     public class Capture
     {
-        internal Capture(string text, int index, int length)
+        private string _value;
+
+        /// <summary>
+        /// Creates a Capture with an input string, a start index of the capture
+        /// and the length of the captured string.
+        /// </summary>
+        /// <param name="text">The input string provided by the user wrapped in a MemoryOrPinnedSpan.</param>
+        internal Capture(in MemoryOrPinnedSpan<char> text, int index, int length)
         {
             Text = text;
             Index = index;
@@ -34,14 +43,22 @@ namespace System.Text.RegularExpressions
         public int Length { get; private protected set; }
 
         /// <summary>
-        /// The original string
+        /// Returns the original text.
         /// </summary>
-        internal string Text { get; private protected set; }
+        internal MemoryOrPinnedSpan<char> Text { get; private protected set; }
+
+        /*
+         * The backing string won't be allocated until the proprety is accessed the first time.
+         */
+        /// <summary>
+        /// Returns the value of this Regex Capture.
+        /// </summary>
+        public string Value => _value ?? (_value = ValueSpan.ToString());
 
         /// <summary>
         /// Returns the value of this Regex Capture.
         /// </summary>
-        public string Value => Text.Substring(Index, Length);
+        public ReadOnlySpan<char> ValueSpan => Text.Span.Slice(Index, Length);
 
         /// <summary>
         /// Returns the substring that was matched.
@@ -49,13 +66,14 @@ namespace System.Text.RegularExpressions
         public override string ToString() => Value;
 
         /// <summary>
-        /// The substring to the left of the capture
+        /// The substring to the left of the capture.
         /// </summary>
-        internal ReadOnlySpan<char> GetLeftSubstring() => Text.AsSpan(0, Index);
+        internal ReadOnlySpan<char> GetLeftSubstring(ReadOnlySpan<char> input) => input.Slice(0, Index);
 
         /// <summary>
-        /// The substring to the right of the capture
+        /// The substring to the right of the capture.
         /// </summary>
-        internal ReadOnlySpan<char> GetRightSubstring() => Text.AsSpan(Index + Length, Text.Length - Index - Length);
+        internal ReadOnlySpan<char> GetRightSubstring(ReadOnlySpan<char> input) =>
+            input.Slice(Index + Length, input.Length - Index - Length);
     }
 }
