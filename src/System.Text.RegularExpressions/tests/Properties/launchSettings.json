@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "xUnit.net Console": {
+      "commandName": "Executable",
+      "executablePath": "$(StartProgram)",
+      "commandLineArgs": "$(StartArguments)",
+      "workingDirectory": "$(StartWorkingDirectory)"
+    }
+  }
+}
