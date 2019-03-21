@@ -1,13 +1,9 @@
 ﻿<Project>
   <PropertyGroup>
-    <PackageConfigurations>
+    <BuildConfigurations>
       netstandard-Windows_NT;
       netstandard;
-      net461-Windows_NT;
-    </PackageConfigurations>
-    <BuildConfigurations>
-      $(PackageConfigurations)
-      netfx-Windows_NT;
+      _netfx;
     </BuildConfigurations>
   </PropertyGroup>
 </Project>

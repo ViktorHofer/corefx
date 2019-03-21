@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <ProjectGuid>{8B21F7AD-928E-474C-875A-83D753BB8A28}</ProjectGuid>
-    <Configurations>netcoreapp-Windows_NT-Debug;netcoreapp-Windows_NT-Release;netfx-Windows_NT-Debug;netfx-Windows_NT-Release</Configurations>
+    <Configurations>netcoreapp-Windows_NT-Debug;netcoreapp-Windows_NT-Release</Configurations>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(CommonPath)\Interop\Windows\Interop.Libraries.cs">
@@ -30,8 +30,5 @@
     <Compile Include="SystemEventsTest.cs" />
     <Compile Include="SystemEvents.DisplaySettings.cs" />
     <Compile Include="SystemEvents.CreateTimer.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
 </Project>

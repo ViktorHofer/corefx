@@ -27,12 +27,6 @@ namespace Microsoft.Win32.SystemEventsTests
         {
             if (s_hwnd == IntPtr.Zero)
             {
-                if (PlatformDetection.IsFullFramework)
-                {
-                    // desktop has a bug where it will allow EnsureSystemEvents to proceed without actually creating the HWND
-                    WaitForSystemEventsWindow();
-                }
-
                 // locate the hwnd used by SystemEvents in this domain
                 var windowClassNameField = typeof(SystemEvents).GetField("s_className", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic) ??  // corefx
                                            typeof(SystemEvents).GetField("className", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);      // desktop

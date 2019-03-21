@@ -49,12 +49,6 @@ namespace Microsoft.Win32.SystemEventsTests
             SystemEvents.TimerElapsed += handler;
             try
             {
-                if (PlatformDetection.IsFullFramework)
-                {
-                    // desktop has a bug where it will allow EnsureSystemEvents to proceed without actually creating the HWND
-                    SystemEventsTest.WaitForSystemEventsWindow();
-                }
-
                 timer = SystemEvents.CreateTimer(TimerInterval);
 
                 Assert.True(elapsed.WaitOne(TimerInterval * SystemEventsTest.ExpectedEventMultiplier));
@@ -99,12 +93,6 @@ namespace Microsoft.Win32.SystemEventsTests
             SystemEvents.TimerElapsed += handler;
             try
             {
-                if (PlatformDetection.IsFullFramework)
-                {
-                    // netfx has a bug where it will allow EnsureSystemEvents to proceed without actually creating the HWND
-                    SystemEventsTest.WaitForSystemEventsWindow();
-                }
-
                 // Create all the timers
                 var timers = new List<IntPtr>();
                 for (int i = 0; i < NumConcurrentTimers; i++)
