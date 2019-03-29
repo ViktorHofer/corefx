@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <RestoreSources Condition="'$(DotNetBuildOffline)' != 'true'">
+      https://www.myget.org/F/vihofer-staging/api/v3/index.json;
       https://dotnet.myget.org/F/dotnet-buildtools/api/v3/index.json;
       https://dotnet.myget.org/F/sourcelink/api/v3/index.json;
       $(RestoreSources)
