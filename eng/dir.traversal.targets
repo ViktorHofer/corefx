@@ -135,7 +135,15 @@
   <Target Name="Clean" DependsOnTargets="$(TraversalCleanDependsOn)" />
   <Target Name="Rebuild" DependsOnTargets="Clean;Build" />
   <Target Name="RebuildAndTest" DependsOnTargets="Rebuild;Test" />
-  <Target Name="Restore" />
+  
+  <Target Name="Restore">
+    <MSBuild Targets="Restore"
+             Projects="@(Project)"
+             BuildInParallel="true"
+             Properties="BuildConfiguration=$(BuildConfiguration)"
+             ContinueOnError="ErrorAndContinue" />
+  </Target>
+
   <Target Name="Test" />
 
 </Project>
