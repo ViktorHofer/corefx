@@ -22,6 +22,7 @@
   <!-- source-built packages -->
   <ItemGroup>
     <!-- arcade -->
+    <!-- <PackageReference Include="runtime.linux-x64.Microsoft.NETCore.Runtime.Mono" Version="6.3.0.622" /> -->
     <PackageReference Include="Microsoft.DotNet.ApiCompat" Version="$(MicrosoftDotNetApiCompatPackageVersion)" />
     <PackageReference Include="Microsoft.DotNet.GenAPI" Version="$(MicrosoftDotNetGenApiPackageVersion)" />
     <PackageReference Include="Microsoft.DotNet.GenFacades" Version="$(MicrosoftDotNetGenFacadesPackageVersion)" />
