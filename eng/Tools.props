@@ -4,6 +4,7 @@
     <Language>C#</Language>
     <!-- Need to keep in sync with CodeAnalysis.targets file. -->
     <AnalyzerPropsFile>$(ArtifactsToolsetDir)Common\Tools.Analyzers.props</AnalyzerPropsFile>
+    <RestoreSources>C:\temp\nuget-cache\</RestoreSources>
   </PropertyGroup>
 
   <Import Project="Analyzers.props" Condition="'$(DotNetBuildFromSource)' != 'true'" />
