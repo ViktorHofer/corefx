@@ -47,6 +47,7 @@ cross/android-rootfs/
 # MSTest test Results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
+testResults.xml
 
 #NUNIT
 *.VisualState.xml

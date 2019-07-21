@@ -23,11 +23,6 @@
     </ItemGroup>
   </Target>
 
-  <!-- Routing dotnet test to a test project's BuildAndTest target. -->
-  <Target Name="VSTest"
-          Condition="'$(IsTestProject)' == 'true' and '$(IsTestSupportProject)' != 'true'"
-          DependsOnTargets="BuildAndTest" />
-
   <Target Name="ValidateTestProjectConfigurations"
           BeforeTargets="CoreCompile"
           Condition="'$(IsTestProject)' == 'true' and '$(IsTestSupportProject)' != 'true' and '$(TargetsNetStandard)' == 'true'">
