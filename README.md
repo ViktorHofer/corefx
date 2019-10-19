@@ -83,4 +83,6 @@ Note: See officially supported [OS versions](https://github.com/dotnet/core/blob
 
 ## License
 
-.NET (including the runtime repo) is licensed under the [MIT](LICENSE) license.
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+Licensed under the [MIT](LICENSE) license.
